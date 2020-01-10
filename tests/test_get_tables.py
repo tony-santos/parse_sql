@@ -7,7 +7,7 @@ import parse4
 
 def test_get_tables():
     sql_str = "SELECT * FROM table1, table2 WHERE table1.column1 = table2.column1;"
-    assert(parse4.get_tables(sql_str)) == ['TABLE1', 'TABLE2']
+    assert(parse4.get_tables(sql_str)) == [('TABLE1', 'TABLE1'), ('TABLE2', 'TABLE2')]
 
 def test_get_tables_mutiline():
     sql_str = """
@@ -15,7 +15,7 @@ def test_get_tables_mutiline():
     FROM table1, table2 
     WHERE table1.column1 = table2.column1;
     """
-    assert(parse4.get_tables(sql_str)) == ['TABLE1', 'TABLE2']
+    assert(parse4.get_tables(sql_str)) == [('TABLE1', 'TABLE1'), ('TABLE2', 'TABLE2')]
 
 def test_get_tables_tables_on_muti_lines():
     sql_str = """
@@ -24,7 +24,7 @@ def test_get_tables_tables_on_muti_lines():
          table3
     WHERE table1.column1 = table2.column1;
     """
-    assert(parse4.get_tables(sql_str)) == ['TABLE1', 'TABLE2', 'TABLE3']
+    assert(parse4.get_tables(sql_str)) == [('TABLE1', 'TABLE1'), ('TABLE2', 'TABLE2'), ('TABLE3', 'TABLE3')]
 
 def test_get_tables_single_table():
     sql_str = """
@@ -32,7 +32,7 @@ def test_get_tables_single_table():
     FROM table1
     WHERE table1.column1 = table2.column1;
     """
-    assert(parse4.get_tables(sql_str)) == ['TABLE1']
+    assert(parse4.get_tables(sql_str)) == [('TABLE1', 'TABLE1')]
 
 def test_get_tables_left_join():
     sql_str = """
@@ -41,4 +41,4 @@ def test_get_tables_left_join():
     LEFT JOIN table2 ON table1.column1 = table2.column2
     WHERE table1.column1 < 10;
     """
-    assert(parse4.get_tables(sql_str)) == ['TABLE1', 'TABLE2']
+    assert(parse4.get_tables(sql_str)) == [('TABLE1', 'TABLE1'), ('TABLE2', 'TABLE2')]

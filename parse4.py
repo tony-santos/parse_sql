@@ -131,11 +131,17 @@ def get_tables(sql_str):
     """
     # start with text between FROM and WHERE or between FROM and ';' and return list of tables by splitting on ',' 
     sql_str = sql_str.upper().lstrip().rstrip()
+    rest_of_query = get_rest_after_main_select(sql_str)
+    print(f"rest_of_query: {rest_of_query}")
+    if rest_of_query[-1] == ';':
+        rest_of_query = rest_of_query[:-1] 
 
-    from_clause = sql_str[sql_str.find('FROM')+5:]
-    print(from_clause)
+    print(f"rest_of_query2: {rest_of_query}")
+    from_clause = rest_of_query
+    print(f"from_clause1: {from_clause}")
     if from_clause.find('WHERE') > 0:
         from_clause = from_clause[:from_clause.find('WHERE')]
+        print(f"from_clause2: {from_clause}")
     
     # left off here. need to figure out what kind of table list has been passed. if simple list separated by commas or combination of different JOIN keywords
     if from_clause.find('JOIN') == -1: # should be simple list of tables separated by comma
@@ -147,7 +153,9 @@ def get_tables(sql_str):
         print(table_line)
     table_lines = [table_line.rstrip().lstrip() for table_line in table_lines]
 
-    return table_lines
+    table_entries = create_table_entries(table_lines)
+    
+    return table_entries
 
 def process_other_join_types(from_clause):
     """generates a list of table lines by separating each splitting the list on the word JOIN and then cleaning up the LEFT/RIGHT/FULL/INNER/OUTER keywords
@@ -163,29 +171,71 @@ def process_other_join_types(from_clause):
   
     table_lines = []
     for table_line_raw in table_lines_raw2:
-        print(table_line_raw)
-        print(table_line_raw.find(' LEFT'))
+        print(f"table_line_raw1: {table_line_raw}")
+#        print(table_line_raw.find(' LEFT'))
 
         # look for LEFT & LEFT OUTER
         if table_line_raw.find(' LEFT') > -1:
             print("found LEFT or LEFT OUTER JOIN")
             if table_line_raw.find(' LEFT') > 0: # there should be a table in front of LEFT XXX JOIN. 
-                table_lines.append(table_line_raw[:table_line_raw.find(' LEFT')].rstrip()).upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
+                print(f"table_line_raw2: {table_line_raw}")
+                print(f"table_line_raw before LEFT: {table_line_raw[:table_line_raw.find(' LEFT')].rstrip()}")
+                print(f"adding1: {table_line_raw[:table_line_raw.find(' LEFT')].rstrip().upper()}")
+                table_lines.append(table_line_raw[:table_line_raw.find(' LEFT')].rstrip().upper()) # get line up to, but not including LEFT. should also remove LEFT OUTER
         # look for LEFT & LEFT OUTER
         elif table_line_raw.find(' RIGHT') > -1:
             print("found RIGHT or RIGHT OUTER JOIN")
             if table_line_raw.find(' RIGHT') > 0: # there should be a table in front of RIGHT XXX JOIN. 
-                table_lines.append(table_line_raw[:table_line_raw.find(' RIGHT')].rstrip()).upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
+                print(f"table_line_raw3: {table_line_raw}")
+                print(f"table_line_raw before RIGHT: {table_line_raw[:table_line_raw.find(' RIGHT')].rstrip()}")
+                print(f"adding2: {table_line_raw[:table_line_raw.find(' RIGHT')].rstrip().upper()}")
+                table_lines.append(table_line_raw[:table_line_raw.find(' RIGHT')].rstrip().upper()) # get line up to, but not including LEFT. should also remove LEFT OUTER
     #        table_line2 = re.search('(LEFT JOIN (.+?) ON ', table_line2, re.DOTALL).group(1)
     # ON and join condition will be on next line. need to check separately at same level as check for LEFT
         if table_line_raw.find(' ON ') > -1:
             print("found JOIN CONDITION")
             if table_line_raw.find(' ON ') > 0: # there should be a table in front of ON. 
-                table_lines.append(table_line_raw[:table_line_raw.find(' ON ')].rstrip()).upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
-            print(f"table_line_raw: {table_line_raw}")
+                print(f"table_line_raw4: {table_line_raw}")
+                print(f"table_line_raw before ON: {table_line_raw[:table_line_raw.find(' ON ')].rstrip()}")
+                print(f"adding3: {table_line_raw[:table_line_raw.find(' ON ')].rstrip().upper()}")
+                table_lines.append(table_line_raw[:table_line_raw.find(' ON ')].rstrip().upper()) # get line up to, but not including LEFT. should also remove LEFT OUTER
     
     return table_lines
 
+def create_table_entries(table_entries):
+    """creates list of tuples with table name and alias.
+
+    alias is needed to perform lookups for queries that utilize table alias
+    
+    Arguments:
+        table_entries {list} -- [list of table records. each entry may include an alias (table_name AS table_alias)]
+    """
+    table_list = []
+    for table_entry in table_entries:
+        print(f"table_entry: {table_entry}")
+        if table_entry.upper().find(' AS ') > -1: # table entry contains an alias (part after the AS)
+            table_name, table_alias = table_entry.upper().split(' AS ')
+        else:
+            table_name = table_alias = table_entry.lstrip().rstrip()
+ 
+        table_list.append((table_name, table_alias))
+    
+    return table_list
+
+def build_column_list(sql_str):
+    pass
+
+def build_table_list(sql_str):
+    """go through steps of building a list of tables used in a query
+    
+    Arguments:
+        sql_str {str} -- text string containing the sql query
+    """
+    query_no_comments = remove_comments(sql_str)
+    print(f"sql_str: {sql_str}")
+    print(f"query_no_comments: {query_no_comments}")
+    tables = get_tables(sql_str)
+    return tables
 
 if __name__ == "__main__":
     
@@ -244,24 +294,37 @@ if __name__ == "__main__":
     WHERE protocol_instance.md_approved = 1
     with no schema binding;
     """
+
+    print_buffer()
     query_no_comments = remove_comments(query1)
-    #print(type(query_no_comments))
-    #print(query_no_comments)
 
     #print(find_sub_queries(query_no_comments))
+    # get columns
+#    columns = get_columns(query_no_comments)
     main_select = get_main_select(query_no_comments)
     print(main_select)
     print_buffer()
-    rest_of_query = get_rest_after_main_select(query_no_comments)
-    print(rest_of_query)
-    print_buffer()
-    print(split_unions(rest_of_query))
-
     columns = process_select(main_select)
     for column in columns:
         print(column)
 
-    print_buffer()
-    print(process_other_join_types('\n LEFT JOIN TABLE2 ON TABLE1.COLUMN1 = TABLE2.COLUMN2'))
+    # get tables
+    tables = build_table_list(query_no_comments)
+#    rest_of_query = get_rest_after_main_select(query_no_comments)
+#    print(rest_of_query)
+#    print_buffer()
+#    print(split_unions(rest_of_query))
 
+    print_buffer()
     print(process_other_join_types('table1 LEFT JOIN table2 ON table1.column1 = table2.column2'))
+    print_buffer()
+    print(process_other_join_types('\n table1 LEFT OUTER JOIN TABLE2 ON TABLE1.COLUMN1 = TABLE2.COLUMN2 \nLEFT OUTER JOIN table3 ON table2.column1 = table3.column2'))
+    print_buffer()
+    table_entries = ['TABLE1', 'TABLE2']
+    print(create_table_entries(table_entries))
+    table_entries = ['TABLE1 AS T1', 'TABLE2']
+    print(create_table_entries(table_entries))
+
+    print_buffer()
+    sql_str = 'SELECT * FROM table1 AS t1, table2 AS t2 WHERE t1.column1 = t2.column2;'
+    print(build_table_list(sql_str))
