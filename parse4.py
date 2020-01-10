@@ -137,6 +137,7 @@ def get_tables(sql_str):
     if from_clause.find('WHERE') > 0:
         from_clause = from_clause[:from_clause.find('WHERE')]
     
+    # left off here. need to figure out what kind of table list has been passed. if simple list separated by commas or combination of different JOIN keywords
     table_lines = from_clause.split(',')
     for table_line in table_lines:
         print(table_line)
