@@ -138,31 +138,51 @@ def get_tables(sql_str):
         from_clause = from_clause[:from_clause.find('WHERE')]
     
     # left off here. need to figure out what kind of table list has been passed. if simple list separated by commas or combination of different JOIN keywords
-    table_lines = from_clause.split(',')
+    if from_clause.find('JOIN') == -1: # should be simple list of tables separated by comma
+        table_lines = from_clause.split(',')
+    else: # since the word JOIN was found, assume it  is a series of LEFT, RIGHT, INNER, or OUTER JOINS
+        table_lines = process_other_join_types(from_clause)
+
     for table_line in table_lines:
         print(table_line)
-
     table_lines = [table_line.rstrip().lstrip() for table_line in table_lines]
 
     return table_lines
 
-def process_other_join_types(table_line):
+def process_other_join_types(from_clause):
+    """generates a list of table lines by separating each splitting the list on the word JOIN and then cleaning up the LEFT/RIGHT/FULL/INNER/OUTER keywords
+    
+    Arguments:
+        from_clause {str} -- text string containing tables, their alias', join types, and join condistions 
+    """
     print_buffer()
-    print(table_line)
-    table_line2 = table_line.lstrip().rstrip()
-    print(table_line2)
-    print(table_line2.find('LEFT JOIN'))
-
+    print_buffer()
+    print(from_clause)
+    table_lines_raw = from_clause.split(' JOIN') # after splitting on JOIN, all table lines except last should have extra keywords at the end to be removed
+    table_lines_raw2 = [table_line.lstrip().rstrip() for table_line in table_lines_raw]
+  
     table_lines = []
-    # look for LEFT OUTER
-    if table_line2.find('LEFT JOIN') > -1:
-        print("found LEFT JOIN")
-        if table_line2.find('LEFT JOIN') > 0: # should be table in front of LEFT JOIN. 
-            table_lines.append(table_line2[:table_line2.find('LEFT JOIN')].rstrip())
-#        table_line2 = re.search('(LEFT JOIN (.+?) ON ', table_line2, re.DOTALL).group(1)
-        table_line2 = table_line2[(table_line2.find('LEFT JOIN') + 9):table_line2.find(' ON ', 9)].lstrip().rstrip()
-        print(table_line2)
-        table_lines.append(table_line2)
+    for table_line_raw in table_lines_raw2:
+        print(table_line_raw)
+        print(table_line_raw.find(' LEFT'))
+
+        # look for LEFT & LEFT OUTER
+        if table_line_raw.find(' LEFT') > -1:
+            print("found LEFT or LEFT OUTER JOIN")
+            if table_line_raw.find(' LEFT') > 0: # there should be a table in front of LEFT XXX JOIN. 
+                table_lines.append(table_line_raw[:table_line_raw.find(' LEFT')].rstrip()).upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
+        # look for LEFT & LEFT OUTER
+        elif table_line_raw.find(' RIGHT') > -1:
+            print("found RIGHT or RIGHT OUTER JOIN")
+            if table_line_raw.find(' RIGHT') > 0: # there should be a table in front of RIGHT XXX JOIN. 
+                table_lines.append(table_line_raw[:table_line_raw.find(' RIGHT')].rstrip()).upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
+    #        table_line2 = re.search('(LEFT JOIN (.+?) ON ', table_line2, re.DOTALL).group(1)
+    # ON and join condition will be on next line. need to check separately at same level as check for LEFT
+        if table_line_raw.find(' ON ') > -1:
+            print("found JOIN CONDITION")
+            if table_line_raw.find(' ON ') > 0: # there should be a table in front of ON. 
+                table_lines.append(table_line_raw[:table_line_raw.find(' ON ')].rstrip()).upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
+            print(f"table_line_raw: {table_line_raw}")
     
     return table_lines
 
@@ -243,3 +263,5 @@ if __name__ == "__main__":
 
     print_buffer()
     print(process_other_join_types('\n LEFT JOIN TABLE2 ON TABLE1.COLUMN1 = TABLE2.COLUMN2'))
+
+    print(process_other_join_types('table1 LEFT JOIN table2 ON table1.column1 = table2.column2'))
