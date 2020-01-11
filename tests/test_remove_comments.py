@@ -16,7 +16,7 @@ def test_remove_comments_beginning_of_line():
 
     assert(parse4.remove_comments(sql_str) == " SELECT * FROM table1")
 
-def test_remove_comments_beginning_of_line():
+def test_remove_comments_beginning_of_line_multiline():
     sql_str = """/* remove this comment */
     SELECT * FROM table1"""
 
