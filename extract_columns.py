@@ -3,13 +3,13 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from utilities import *
+from extract_utilities import *
 
 def print_buffer(size = 3):
     print("\n" * size)
 
 def remove_comments(sql_str):
-
+    print("entering remove_comments")
     # remove the /* */ comments
     q = re.sub(r"/\*[^*]*\*+(?:[^*/][^*]*\*+)*/", "", sql_str)
 
@@ -24,10 +24,8 @@ def remove_comments(sql_str):
     # remove trailing -- and # comments
     q = " ".join([re.split("--|#", line)[0] for line in lines])
 
+    print("returning from remove_comments")
     return q
-
-def split_unions(sql_str):
-    return re.split('UNION', sql_str)
 
 def get_main_select(sql_str):
     return re.search('SELECT (.+?) FROM', sql_str, re.DOTALL).group(0)
@@ -49,6 +47,7 @@ def field_split(fields_string, separator=','):
 
     returns list of fields
     """
+    print(f"entering field_split: fields_string = {fields_string}")
     fields = []
     parenthesis_count = 0
     current_field = ''
@@ -56,6 +55,8 @@ def field_split(fields_string, separator=','):
         if char == ',' and parenthesis_count == 0: # split here by appending current field to fields and setting current_field to empty string
             fields.append(current_field)
             current_field = ''
+            print(f"appending: {current_field}")
+            print(f"fields: {fields}")
         else:
             current_field = current_field + char
             if char == '(':
@@ -65,7 +66,7 @@ def field_split(fields_string, separator=','):
     
     # add last field if it was not already added to fields
     if current_field != fields[-1]:
-        fields.extend(current_field.lstrip().rstrip())
+        fields.append(current_field.lstrip().rstrip())
 
     return fields
             
@@ -124,9 +125,6 @@ def process_select(sql_str):
     return columns
 
 def build_column_list(sql_str):
-    pass
-
-def build_table_list(sql_str):
     """go through steps of building a list of tables used in a query
     
     Arguments:
@@ -135,67 +133,15 @@ def build_table_list(sql_str):
     query_no_comments = remove_comments(sql_str)
     print(f"sql_str: {sql_str}")
     print(f"query_no_comments: {query_no_comments}")
-    tables = get_tables(sql_str)
-    return tables
+    columns = get_columns(sql_str)
+
+    return columns
 
 
 if __name__ == "__main__":
-    
-    query1 = """
-    CREATE OR REPLACE VIEW rlsc_master.v_webmtbs_unified_view
-    AS
-    /* should be removed */
-    -- should be removed
-    --- should be removed
+    with open(sys.argv[1], 'r') as myfile:
+        query1 = myfile.read()
 
-    ---without the DISTINCT, the time takes to generate the mv_v_ will be cut a lot, and the total number of records will not differ much
-    SELECT protocol_instance.md_batch_name AS experiment_run_info_metid,  -- should be removed
-            protocol_instance.md_compound_name AS compound_name_metid,  /* should be removed */
-            "substring"(protocol_instance.md_compound_name::text, 1, 11) AS parent_id_metid, protocol_instance.md_id AS protocol_instance_id_metid, clustered_compound.md_id AS clustered_compound_id_metid, compound_data.md_area_ms AS ms_signal_area_metid, compound_data.md_id AS compound_data_id_metid, compound_data.md_ion_formula AS metabolite_ion_formula_metid, compound_data.metabolite_mz_value_metid, compound_data.metabolite_mz_diff_ppm_metid, compound_data.metabolite_mz_diff_mda_metid, compound_data.md_name AS metabolite_name_metid, compound_data.metabolite_area_abs_metid, mim_calc.mim AS metabolite_mim_metid, mass_shift_calc.mass_shift AS mass_shift_metid, compound_data.retention_time_metid, compound_data.md_z AS metabolite_z_metid, 
-            
-    FROM (
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_clinical_signs
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_invivo_results
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_food_consumption
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_necropsy
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_histopathology
-    ) mv_v_salar_animal_txt_study
-    LEFT JOIN (
-    SELECT animal_txt2, study2, studyday2
-    FROM rlsc_master.mv_v_salar_clinical_signs
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_invivo_results
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_food_consumption
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_necropsy
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_histopathology
-    ) mv_v_salar_animal_txt_study2
-    LEFT JOIN rlsc_master.webmtbs_md_protocol_instance protocol_instance
-
-    LEFT JOIN rlsc_master.mv_v_webmtbs_unified_view_compound_data compound_data ON protocol_instance.md_id = compound_data.md_protocol_instance_id
-    LEFT JOIN rlsc_master.webmtbs_md_experiment experiment ON compound_data.md_experiment_id = experiment.md_id
-    LEFT JOIN rlsc_master.mv_v_webmtbs_unified_view_clustered_compound
-    
-    clustered_compound ON clustered_compound.compound_md_id = compound_data.md_id
-    ---LEFT JOIN rlsc_master.webmtbs_md_compound_data compound_sub ON compound_sub.md_id = experiment.md_substrate_id
-    WHERE protocol_instance.md_approved = 1
-    with no schema binding;
-    """
 
     print_buffer()
     query_no_comments = remove_comments(query1)
@@ -210,44 +156,6 @@ if __name__ == "__main__":
     for column in columns:
         print(column)
 
-    # get tables
-    tables = build_table_list(query_no_comments)
-#    rest_of_query = get_rest_after_main_select(query_no_comments)
-#    print(rest_of_query)
-#    print_buffer()
-#    print(split_unions(rest_of_query))
-
     print_buffer()
-    print(process_other_join_types('table1 LEFT JOIN table2 ON table1.column1 = table2.column2'))
-    print_buffer()
-    print(process_other_join_types('\n table1 LEFT OUTER JOIN TABLE2 ON TABLE1.COLUMN1 = TABLE2.COLUMN2 \nLEFT OUTER JOIN table3 ON table2.column1 = table3.column2'))
-    print_buffer()
-    table_entries = ['TABLE1', 'TABLE2']
-    print(create_table_entries(table_entries))
-    table_entries = ['TABLE1 AS T1', 'TABLE2']
-    print(create_table_entries(table_entries))
-
-    print_buffer()
-    sql_str = 'SELECT * FROM table1 AS t1, table2 AS t2 WHERE t1.column1 = t2.column2;'
-    print(build_table_list(sql_str))
-
-    print_buffer()
-    sql_str = "(SELECT column1 FROM table1, table2, table3) AS table4"
-    print(f"process_subquery results: {process_subquery(sql_str)}")
-
-    print_buffer()
-    sql_str = "(SELECT column2 FROM table2 AS t2, table3 AS t3, table4 AS t4 WHERE table2.column2 = table3.column2 AND table3.column2 = table4.column3) AS table5"
-    print(f"process_subquery results: {process_subquery(sql_str)}")
-
-    print_buffer()
-    sql_str = "(SELECT column1 FROM table1 UNION SELECT column2 FROM table2 ) AS table5"
-    print(f"process_subquery results: {process_subquery(sql_str)}")
-
-    print_buffer()
-    sql_str = "(SELECT column1 FROM table1 AS t1 UNION SELECT column2 FROM table2 AS t2 UNION SELECT column2 FROM table3 AS t3) AS table5"
-    print(f"process_subquery results: {process_subquery(sql_str)}")
-
-    print_buffer()
-    table_list = build_table_list(query1)
-    print_buffer()
-    print(f"table_list: {table_list}")
+    sql_str = " table_name1.column_name1 AS column_alias1, table_name2.column_name2 AS column_alias2"
+    print(field_split(sql_str))
