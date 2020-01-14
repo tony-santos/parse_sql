@@ -15,7 +15,7 @@ logfile_datetime = datetime.now().strftime(datetime_format)
 #print(logfile_datetime)
 #exit(0)
 
-logger.add(f"output_{logfile_datetime}.log", backtrace=True, diagnose=True)
+logger.add(f"output-{sys.argv[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
 
 def get_tables(sql_str):
     """extract table names from sql query
@@ -156,6 +156,7 @@ def process_subquery(table_entry):
     logger.info(f"table_entry after removing ')': {table_entry}")
     logger.info(f"length of table_entry after removing ')': {len(table_entry)}")
     # get part after FROM
+    logger.info(f"position of 'FROM': {table_entry.upper().find('FROM')}")
     table_entry = table_entry.upper().lstrip().rstrip()
     rest_of_query = get_rest_after_main_select(table_entry)
     logger.info(f"rest_of_query (after FROM): {rest_of_query}")
@@ -166,8 +167,10 @@ def process_subquery(table_entry):
     from_clause = rest_of_query
     logger.info(f"from_clause1: {from_clause}")
     if table_entry.upper().find('UNION') > -1: # one or more unions found in subquery. split and process each one
+        logger.info(f"UNION found at position {table_entry.upper().find('UNION')}")
         subqueries = table_entry.upper().split('UNION')
         for subquery in subqueries:
+            logger.info(f"calling process_subquery with: {subquery}")
             table_entries.extend(process_subquery(subquery))
     else:
         if from_clause.find('WHERE') > 0:
@@ -180,7 +183,7 @@ def process_subquery(table_entry):
             table_lines = process_other_join_types(from_clause)
 
         for table_line in table_lines:
-            logger.info(table_line)
+            logger.info(f"table_line: {table_line}")
         table_lines = [table_line.rstrip().lstrip() for table_line in table_lines]
 
         table_entries = create_table_entries(table_lines)
