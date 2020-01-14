@@ -84,4 +84,21 @@ def get_matching_paren(sql_str, open_paren_position=0):
     return matching_paren_position
 
 
-def get_matching_from
+if __name__ == "__main__":
+    query1 = "SELECT col1, col2, col3 FROM tab1"
+    logger.info(f"query: {query1}")
+    logger.info(f"get_select(query1): {get_select(query1)}")
+    logger.info(f"get_from(query1): {get_from(query1)}")
+ 
+    query2 = "SELECT col1, col2, col3 FROM (SELECT col1, col2, col3 FROM tab1)"
+    logger.info(f"query: {query2}")
+    logger.info(f"get_select(query2): {get_select(query2)}")
+    logger.info(f"get_from(query2): {get_from(query2)}")
+    logger.info(f"get_matching_from(query2): {get_matching_from(query2)}")
+    
+    query3 = "SELECT col1, col2, col3 FROM (SELECT col1, col2, col3 FROM tab1) WHERE col1 < 10"
+    logger.info(f"query: {query3}")
+    logger.info(f"get_select(query3): {get_select(query3)}")
+    logger.info(f"get_from(query3): {get_from(query3)}")
+    logger.info(f"get_matching_from(query3): {get_matching_from(query3)}")
+    
