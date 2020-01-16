@@ -8,15 +8,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from extract_utilities import *
 from loguru import logger
 
-#print(datetime.now())
-datetime_format = "%Y%m%d-%H%M"
-logfile_datetime = datetime.now().strftime(datetime_format)
-#print(datetime_format)
-#print(logfile_datetime)
-#exit(0)
-
-logger.add(f"output-{sys.argv[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
-
 def get_tables(sql_str):
     """extract table names from sql query
     
@@ -208,6 +199,15 @@ def build_table_list(sql_str):
 
 
 if __name__ == "__main__":
+    #print(datetime.now())
+    datetime_format = "%Y%m%d-%H%M"
+    logfile_datetime = datetime.now().strftime(datetime_format)
+    #print(datetime_format)
+    #print(logfile_datetime)
+    #exit(0)
+
+    logger.add(f"output-{sys.argv[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
+
     with open(sys.argv[1], 'r') as myfile:
         query1 = myfile.read()
     
@@ -286,4 +286,4 @@ if __name__ == "__main__":
     print('\nabcdef\n'.lstrip().rstrip())
     print("...")
 
-print(datetime_format)
+    print(datetime_format)
