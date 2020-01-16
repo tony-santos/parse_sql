@@ -31,6 +31,68 @@ def get_rest_after_main_select(sql_str):
     return sql_str[sql_str.upper().find("FROM")+4:]
 #    return re.search('FROM (.+?)', sql_str, re.DOTALL).group(1)
 
+def get_select_position(sql_str, start_pos=0):
+    select_position = sql_str.upper().find('SELECT', start_pos)
+    if sql_str[select_position + 6] in string.whitespace: # we matched keyword and not a substring (unless string ends with select and is followed by whitespace)
+        pass
+    else:
+        select_position = get_select_position(sql_str, select_position+6) # we matched a substring. keep looking
+        
+    logger.info(f"select_position = {select_position}")
+    logger.info(f"character after 'SELECT':{sql_str[select_position + 6]}:")
+    logger.info(f"whitespace after SELECT: {sql_str[select_position + 6] in string.whitespace}")
+    if select_position > -1:
+        logger.info(f"before SELECT: {sql_str[:select_position]}")
+
+    return select_position
+
+def get_matching_from_position(sql_str, start_pos=0):
+    sql_str = sql_str.upper()
+    select_level = 1
+    matching_from_position = -1
+    for token, index in enumerate(sql_str.split()):
+        if token == 'SELECT':
+            select_level = select_level + 1
+            logger.info(f"another select found. select_level: {select_level}")
+        elif token== 'FROM':
+            select_level = select_level - 1
+            logger.info(f"FROM found. select_level: {select_level}")
+
+            if select_level == 0:
+                matching_from_position = index
+                break
+    logger.info(f"paren_level: {select_level}")
+
+    return matching_from_position
+
+def get_from_position(sql_str, start_pos=0):
+    sql_str = sql_str.upper()
+    from_position = sql_str.find('FROM', start_pos)
+    logger.info(f"from_position: {from_position}")
+    if from_position > -1:
+        logger.info(f"before FROM: {from_position}")
+        select_position = sql_str.find('SELECT', 0, from_position)
+        if select_position > -1:
+            logger.info(f"SELECT found in field list at position: {sql_str}. probable subquery")
+            logger.info(f"sql_str: {sql_str[:from_position]}")
+
+def get_matching_paren_position(sql_str, open_paren_position=0):
+    paren_level = 1
+    matching_paren_position = -1
+    for char, index in enumerate(sql_str):
+        if char == '(':
+            paren_level = paren_level + 1
+            logger.info(f"another opening paren found. paren_level: {paren_count}")
+        elif char== ')':
+            paren_level = paren_level - 1
+            logger.info(f"closing paren found. paren_level: {paren_count}")
+            if paren_level == 0:
+                matching_paren_position = index
+                break
+    logger.info(f"paren_level: {paren_level}")
+
+    return matching_paren_position
+
 
 if __name__ == "__main__":
     
