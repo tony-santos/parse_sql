@@ -1,4 +1,7 @@
 import re
+import string
+
+from loguru import logger
 
 def print_buffer(size = 3):
     print("\n" * size)
@@ -47,22 +50,28 @@ def get_select_position(sql_str, start_pos=0):
     return select_position
 
 def get_matching_from_position(sql_str, start_pos=0):
-    sql_str = sql_str.upper()
+    logger.info(f"entering get_matching_from_position: start_pos: {start_pos}")
+    # make copy of sql_str
+    sql_str = sql_str.upper()[start_pos:]
     select_level = 1
     matching_from_position = -1
-    for token, index in enumerate(sql_str.split()):
+    for index, token in enumerate(sql_str.split()):
+        logger.info(f"index: {index},      token: {token}")
         if token == 'SELECT':
             select_level = select_level + 1
             logger.info(f"another select found. select_level: {select_level}")
+            select_position = sql_str.find('SELECT')
         elif token== 'FROM':
+            logger.info(f"FROM found in token: {index}")
+            from_position = sql_str.find('FROM')
             select_level = select_level - 1
             logger.info(f"FROM found. select_level: {select_level}")
 
             if select_level == 0:
-                matching_from_position = index
+                matching_from_position = start_pos + from_position
                 break
-    logger.info(f"paren_level: {select_level}")
-
+    logger.info(f"select_level: {select_level}")
+    logger.info(f"returning from get_matchin_from_position.      matching_from_position: {matching_from_position}")
     return matching_from_position
 
 def get_from_position(sql_str, start_pos=0):

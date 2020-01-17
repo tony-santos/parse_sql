@@ -4,9 +4,22 @@ import re
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import string
+
+from loguru import logger
+
+datetime_format = "%Y%m%d-%H%M"
+logfile_datetime = datetime.now().strftime(datetime_format)
+#print(datetime_format)
+#print(logfile_datetime)
+#exit(0)
+
+logger.add(f"output-{sys.argv[0].split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
 
 from extract_utilities import *
-from loguru import logger
+
+
+
 
 def get_tables(sql_str):
     """extract table names from sql query
@@ -197,17 +210,43 @@ def build_table_list(sql_str):
     tables = get_tables(sql_str)
     return tables
 
+def more_selects(sql_str):
+    return sql_str.upper().find('SELECT') > -1
+
+def split_fields(fields_string, separator=','):
+    """
+    splits a string using separator unless the separator is within parentheses
+    takes string of fields
+
+    returns list of fields
+    """
+    logger.info(f"entering split_fields: fields_string = {fields_string} len(fields_string) = {len(fields_string)}")
+    fields = []
+    parenthesis_count = 0
+    current_field = ''
+    for char in fields_string.lstrip().rstrip():
+        if char == ',' and parenthesis_count == 0: # split here by appending current field to fields and setting current_field to empty string
+            fields.append(current_field)
+            current_field = ''
+            logger.info(f"appending: {current_field}")
+            logger.info(f"fields: {fields}")
+        else:
+            current_field = current_field + char
+            if char == '(':
+                parenthesis_count = parenthesis_count + 1
+            elif char == ')':
+                parenthesis_count = parenthesis_count - 1
+    
+    # add last field if it was not already added to fields
+    if current_field != fields[-1]:
+        fields.append(current_field.lstrip().rstrip())
+
+    return fields
+            
+
 
 if __name__ == "__main__":
     #print(datetime.now())
-    datetime_format = "%Y%m%d-%H%M"
-    logfile_datetime = datetime.now().strftime(datetime_format)
-    #print(datetime_format)
-    #print(logfile_datetime)
-    #exit(0)
-
-    logger.add(f"output-{sys.argv[0].split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
-
     with open(sys.argv[1], 'r') as myfile:
         query1 = myfile.read()
     
@@ -216,6 +255,20 @@ if __name__ == "__main__":
     query_no_comments = remove_comments(query1)
 
     logger.info(f"query1: {query1}")
+    sql_str = query1
+    # while there are more queries/subqueries, get tables
+    while more_selects:
+        select_position = get_select_position(sql_str)
+        from_position = get_matching_from_position(sql_str, select_position + 6)
+        logger.info(f"select_position: {select_position},   from_postion: {from_position}")
+        if from_position > -1:
+            fields = split_fields(sql_str[select_position + 6:from_position])
+            logger.info(f"fields: {fields}")
+            sql_str = sql_str[from_position + 4:]
+        else:
+            break
+    
+    exit(0)
     #logger.info(find_sub_queries(query_no_comments))
 
     # get tables
