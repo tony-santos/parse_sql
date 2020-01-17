@@ -227,9 +227,8 @@ def split_fields(fields_string, separator=','):
     for char in fields_string.lstrip().rstrip():
         if char == ',' and parenthesis_count == 0: # split here by appending current field to fields and setting current_field to empty string
             fields.append(current_field)
-            current_field = ''
             logger.info(f"appending: {current_field}")
-            logger.info(f"fields: {fields}")
+            current_field = ''
         else:
             current_field = current_field + char
             if char == '(':
@@ -239,8 +238,10 @@ def split_fields(fields_string, separator=','):
     
     # add last field if it was not already added to fields
     if current_field != fields[-1]:
+        logger.info(f"appending last field: {current_field}")
         fields.append(current_field.lstrip().rstrip())
 
+    logger.info(f"fields: {fields}")
     return fields
             
 
@@ -250,24 +251,26 @@ if __name__ == "__main__":
     with open(sys.argv[1], 'r') as myfile:
         query1 = myfile.read()
     
-
+    select_count = 0
     print_buffer()
     query_no_comments = remove_comments(query1)
 
     logger.info(f"query1: {query1}")
     sql_str = query1
     # while there are more queries/subqueries, get tables
-    while more_selects:
+    while more_selects(sql_str):
         select_position = get_select_position(sql_str)
         from_position = get_matching_from_position(sql_str, select_position + 6)
         logger.info(f"select_position: {select_position},   from_postion: {from_position}")
         if from_position > -1:
+            select_count = select_count + 1
             fields = split_fields(sql_str[select_position + 6:from_position])
             logger.info(f"fields: {fields}")
             sql_str = sql_str[from_position + 4:]
         else:
             break
     
+    logger.info(f"select_count = {select_count}")
     exit(0)
     #logger.info(find_sub_queries(query_no_comments))
 

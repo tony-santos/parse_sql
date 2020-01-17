@@ -35,17 +35,23 @@ def get_rest_after_main_select(sql_str):
 #    return re.search('FROM (.+?)', sql_str, re.DOTALL).group(1)
 
 def get_select_position(sql_str, start_pos=0):
+    logger.info(f"entering get_select_position: start_pos = {start_pos}   sql_str: {sql_str}")
     select_position = sql_str.upper().find('SELECT', start_pos)
-    if sql_str[select_position + 6] in string.whitespace: # we matched keyword and not a substring (unless string ends with select and is followed by whitespace)
-        pass
+    if select_position == -1:
+        logger.info(f"SELECT not found. should have hit more_selects = False")
     else:
-        select_position = get_select_position(sql_str, select_position+6) # we matched a substring. keep looking
-        
-    logger.info(f"select_position = {select_position}")
-    logger.info(f"character after 'SELECT':{sql_str[select_position + 6]}:")
-    logger.info(f"whitespace after SELECT: {sql_str[select_position + 6] in string.whitespace}")
-    if select_position > -1:
-        logger.info(f"before SELECT: {sql_str[:select_position]}")
+        if sql_str[select_position + 6] in string.whitespace: # we matched keyword and not a substring (unless string ends with select and is followed by whitespace)
+            logger.info(f"matched SELECT keyword")
+            pass
+        else:
+            logger.info(f"matched SELECT but not keyword: {sql_str[select_position:select_position + 15]}")
+            select_position = get_select_position(sql_str, select_position+6) # we matched a substring. keep looking
+            
+        logger.info(f"select_position = {select_position}")
+        logger.info(f"character after 'SELECT':{sql_str[select_position + 6]}:")
+        logger.info(f"whitespace after SELECT: {sql_str[select_position + 6] in string.whitespace}")
+        if select_position > -1:
+            logger.info(f"before SELECT: {sql_str[:select_position]}")
 
     return select_position
 
@@ -71,7 +77,7 @@ def get_matching_from_position(sql_str, start_pos=0):
                 matching_from_position = start_pos + from_position
                 break
     logger.info(f"select_level: {select_level}")
-    logger.info(f"returning from get_matchin_from_position.      matching_from_position: {matching_from_position}")
+    logger.info(f"returning from get_matching_from_position.      matching_from_position: {matching_from_position}")
     return matching_from_position
 
 def get_from_position(sql_str, start_pos=0):
