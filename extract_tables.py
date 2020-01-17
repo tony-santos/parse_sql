@@ -210,8 +210,8 @@ def build_table_list(sql_str):
     tables = get_tables(sql_str)
     return tables
 
-def more_selects(sql_str):
-    return sql_str.upper().find('SELECT') > -1
+def more_selects(sql_str, start_pos=0):
+    return sql_str[start_pos:].upper().find('SELECT') > -1
 
 def split_fields(fields_string, separator=','):
     """
@@ -246,31 +246,86 @@ def split_fields(fields_string, separator=','):
             
 
 
+def get_table_entries(sql_str, from_pos=0):
+    """[summary]
+    
+    Arguments:
+        sql_str {str} -- text string containing query
+    
+    Keyword Arguments:
+        from_pos {int} -- [position of FROM keyword for which we are getting the table entries] (default: {0})
+    
+    Returns:
+        table_entries_str {str} -- text string containing the portion of query that has the table entries
+    """
+    if sql_str[from_pos: from_pos + 4] == 'FROM': 
+        start_pos = from_pos + 4 # move past 
+
 if __name__ == "__main__":
     #print(datetime.now())
     with open(sys.argv[1], 'r') as myfile:
         query1 = myfile.read()
     
     select_count = 0
+    select_from_wheres = []
+    columns = []
     print_buffer()
     query_no_comments = remove_comments(query1)
 
-    logger.info(f"query1: {query1}")
-    sql_str = query1
-    # while there are more queries/subqueries, get tables
-    while more_selects(sql_str):
-        select_position = get_select_position(sql_str)
-        from_position = get_matching_from_position(sql_str, select_position + 6)
-        logger.info(f"select_position: {select_position},   from_postion: {from_position}")
+    query_no_tabs_newlines = query_no_comments.replace("\t", " ").replace("\n", " ")
+    query_single_spaces = query_no_tabs_newlines
+    while query_single_spaces.find("  ") > -1:
+        # logger.info(query_single_spaces.find("  "))
+        query_single_spaces = query_single_spaces.replace("  ", " ")
+    # logger.info(f"query_all_spaces: {query_single_spaces}")
+
+    actual_select_position = 0
+    actual_from_position = 0
+    select_position = -6
+    from_position = 0
+
+# does it make sense to replace all whitespace with spaces to make finding substring by joining tokens easier? going to try
+
+
+    # logger.info(f"query1: {query1}")
+    # sql_str = query1
+    sql_str = query_single_spaces
+    logger.info(f"sql_str: {sql_str}")
+    # while there are more queries/subqueries, get columns
+    while more_selects(sql_str, select_position + 6):
+        select_position = get_select_position(sql_str, select_position + 6)
+        # actual_select_position = actual_from_position + select_position
+        from_position = get_matching_from_position(sql_str, select_position)
+        where_position = get_matching_where_position(sql_str, from_position)
+        # actual_from_position = actual_select_position + from_position
+        logger.info(f"select_position: {select_position},   from_postion: {from_position},   where_postion: {where_position}")
         if from_position > -1:
             select_count = select_count + 1
+            # select_from_pairs.append((actual_select_position, actual_from_position))
+            select_from_wheres.append((select_position, from_position, where_position))
             fields = split_fields(sql_str[select_position + 6:from_position])
             logger.info(f"fields: {fields}")
-            sql_str = sql_str[from_position + 4:]
+            new_columns = [parse_field(field) for field in fields]
+            logger.info(f"new_columns: {new_columns}")
+            columns.extend(new_columns)
+            # sql_str = sql_str[select_position + 6:]
         else:
             break
     
     logger.info(f"select_count = {select_count}")
+    logger.info(f"select_from_wheres: {select_from_wheres}")
+    for select_from_where in select_from_wheres:
+        select_pos, from_pos, where_pos = select_from_where
+        logger.info(f"select_pos: {select_pos},   from_pos: {from_pos},   where_pos: {where_pos}")
+        if from_pos - select_pos < 200:
+            logger.info(f"sql_str part1: {sql_str[select_pos: from_pos+4]}")
+        else:
+            logger.info(f"sql_str part1: {sql_str[select_pos: select_pos + 80]} ... {sql_str[from_pos - 80: from_pos + 4 ]}")
+
+        if where_pos - from_pos < 200:
+            logger.info(f"sql_str part2: {sql_str[from_pos: where_pos+5]}")
+        else:
+            logger.info(f"sql_str part2: {sql_str[from_pos: from_pos + 80]} ... {sql_str[where_pos - 80: where_pos + 5 ]}")
     exit(0)
     #logger.info(find_sub_queries(query_no_comments))
 

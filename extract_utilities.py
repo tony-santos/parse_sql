@@ -35,7 +35,7 @@ def get_rest_after_main_select(sql_str):
 #    return re.search('FROM (.+?)', sql_str, re.DOTALL).group(1)
 
 def get_select_position(sql_str, start_pos=0):
-    logger.info(f"entering get_select_position: start_pos = {start_pos}   sql_str: {sql_str}")
+    logger.info(f"entering get_select_position: start_pos = {start_pos}   sql_str: {sql_str[start_pos: start_pos+200]}")
     select_position = sql_str.upper().find('SELECT', start_pos)
     if select_position == -1:
         logger.info(f"SELECT not found. should have hit more_selects = False")
@@ -51,8 +51,9 @@ def get_select_position(sql_str, start_pos=0):
         logger.info(f"character after 'SELECT':{sql_str[select_position + 6]}:")
         logger.info(f"whitespace after SELECT: {sql_str[select_position + 6] in string.whitespace}")
         if select_position > -1:
-            logger.info(f"before SELECT: {sql_str[:select_position]}")
-
+            logger.info(f"before SELECT: {sql_str[max(0,select_position - 100):select_position]}")
+    
+    logger.info(f"returning from get_select_position: {select_position}")
     return select_position
 
 def get_matching_from_position(sql_str, start_pos=0):
@@ -61,9 +62,75 @@ def get_matching_from_position(sql_str, start_pos=0):
     sql_str = sql_str.upper()[start_pos:]
     select_level = 1
     matching_from_position = -1
-    for index, token in enumerate(sql_str.split()):
+    tokens = sql_str.split() # generate list of tokens in order to grab multiple tokens later
+    for index, token in enumerate(tokens[1:]):  # skip 1st token (shuold be SELECT)
         logger.info(f"index: {index},      token: {token}")
         if token == 'SELECT':
+            select_level = select_level + 1
+            logger.info(f"another select found. select_level: {select_level}")
+            select_position = sql_str.find('SELECT')
+        elif token== 'FROM':
+            logger.info(f"FROM found in token: {index}")
+            select_level = select_level - 1
+            logger.info(f"FROM found. select_level: {select_level}")
+
+            if select_level == 0:
+                match_string = " ".join(tokens[(index - 2):(index + 2)]) # assume at least 3 tokens before closing FROM encountered. use +2 because we are starting with token 1 instead of token 0
+                logger.info(f"match_string: {match_string}")
+                matching_from_position = sql_str.find(match_string) + len(match_string) - 4 # subtract 4 for length of FROM
+                logger.info(f"match_string location: {matching_from_position}   --{sql_str[matching_from_position - 5: matching_from_position + 5]}--")
+                logger.info(f"match_string location: {matching_from_position}   ++{sql_str[matching_from_position:matching_from_position+5]}++")
+                matching_where_position = start_pos + matching_from_position
+                break
+    logger.info(f"select_level: {select_level}")
+    matching_from_position = matching_from_position + start_pos
+    logger.info(f"returning from get_matching_from_position.      matching_from_position: {matching_from_position}")
+    return matching_from_position
+
+def get_matching_where_position(sql_str, from_pos):
+    # take sql_str after from_pos
+    # break into tokens
+    # get where or end of query at same level ('WHERE', ';', ')' if paren-level == -1)
+    logger.info(f"entering get_matching_where_position: from_pos: {from_pos}")
+    logger.info(f"sql_str: {sql_str[from_pos: from_pos + 130]}")
+    # make copy of sql_str
+    sql_str = sql_str.upper()[from_pos:]
+    select_level = 1
+    from_level = 0
+    paren_level = 0
+    open_paren_found = False
+    matching_where_position = -1
+    tokens = sql_str.split() # generate list of tokens in order to grab multiple tokens later
+    for index, token in enumerate(tokens[1:]):  # skip 1st token (shuold be FROM)
+        logger.info(f"index: {index},      token: {token}")
+        if token == '(':
+            open_paren_found = True
+            paren_level = paren_level + 1
+            logger.info(f"paren found in token {index}     paren_level = {paren_level}")
+        elif token == ')':
+            paren_level = paren_level - 1
+            logger.info(f"paren found in token {index}     paren_level = {paren_level}")
+            if paren_level == -1 or (paren_level == 0 and open_paren_found): # either closing paren for subquery already open or end of subquery after FROM
+                logger.info(f"ending paren found in token {index}   need to match correct string {tokens[index - 4:index + 1]}")
+                match_string = " ".join(tokens[index - 2:index + 2]) # assume at least 3 tokens before closing paren encountered
+                logger.info(f"match_string: {match_string}")
+                match_string_location = sql_str.find(match_string) + len(match_string) - 1
+                logger.info(f"match_string location: {match_string_location}   --{sql_str[match_string_location - 2: match_string_location + 2]}--")
+                logger.info(f"match_string location: {match_string_location}   ++{sql_str[match_string_location]}++")
+                matching_where_position = from_pos + match_string_location
+                break
+        elif token =='UNION': # should be matching where position if select_level == 1
+            logger.info(f"UNION found in token {index}")
+            logger.info(f"select_level: {select_level}")
+            if select_level == 1 and paren_level == 0:
+                match_string = " ".join(tokens[index - 2:index + 2]) # assume at least 3 tokens before UNION encountered. using +2 because we started on index 1
+                logger.info(f"match_string: {match_string}")
+                match_string_location = sql_str.find(match_string) + len(match_string) - 1
+                logger.info(f"match_string location: {match_string_location}   --{sql_str[match_string_location - 2: match_string_location + 2]}--")
+                logger.info(f"match_string location: {match_string_location}   ++{sql_str[match_string_location]}++")
+                matching_where_position = from_pos + match_string_location
+                break
+        elif token == 'SELECT':
             select_level = select_level + 1
             logger.info(f"another select found. select_level: {select_level}")
             select_position = sql_str.find('SELECT')
@@ -73,12 +140,20 @@ def get_matching_from_position(sql_str, start_pos=0):
             select_level = select_level - 1
             logger.info(f"FROM found. select_level: {select_level}")
 
-            if select_level == 0:
-                matching_from_position = start_pos + from_position
+            # if select_level == 0:
+            #     matching_from_position = start_pos + from_position
+        elif token== 'WHERE':
+            logger.info(f"WHERE found in token: {index}")
+            where_position = sql_str.find('WHERE')
+            from_level = from_level - 1
+            logger.info(f"FROM found. select_level: {select_level}")
+
+            if from_level == 0:
+                matching_where_position = from_pos + where_position
                 break
     logger.info(f"select_level: {select_level}")
-    logger.info(f"returning from get_matching_from_position.      matching_from_position: {matching_from_position}")
-    return matching_from_position
+    logger.info(f"returning from get_matching_where_position.      matching_where_position: {matching_where_position}")
+    return matching_where_position
 
 def get_from_position(sql_str, start_pos=0):
     sql_str = sql_str.upper()
@@ -107,6 +182,39 @@ def get_matching_paren_position(sql_str, open_paren_position=0):
     logger.info(f"paren_level: {paren_level}")
 
     return matching_paren_position
+
+def parse_field(field):
+    table_name, column_name, alias = '', '', ''
+    field = field.upper().lstrip()
+    if field.upper().find(' AS ') == -1: # AS not found in string
+        if field.find('.') > 0: # no AS, but contains dot (.) to separate table name and column name
+            table_name, column_name = field.split('.')
+        else: # no AS and no dot (only column name)
+            column_name = field
+    else:
+        source = re.search('(.+?) AS ', field, re.DOTALL)
+        #print("source: ", source.group(1))
+        #print("---", source.group(1).upper()[0])
+        if source:
+            # check for function names
+            if source.group(1).startswith('CASE') or source.group(1).lstrip().startswith('ROUND') \
+                or source.group(1).startswith("'") or source.group(1).startswith('"'):
+                table_name = ''
+                column_name = source.group(1)
+            else: 
+                if source.group(1).find('.') > -1:
+                    table_name, column_name = source.group(1).split('.')
+                else: # no dot means no table alias
+                    table_name = ''
+                    column_name = source.group(1)
+            
+            #alias  = re.search(' AS (.+?)', field.upper(), re.DOTALL).group(1)
+            alias  = field[field.find(' AS ') + 4:]
+    print(f"alias: {alias}, {len(alias)}")
+    if len(alias) == 0:
+        alias = column_name
+    return (table_name, column_name, alias)
+
 
 
 if __name__ == "__main__":
