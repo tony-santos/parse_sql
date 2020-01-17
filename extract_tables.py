@@ -206,7 +206,7 @@ if __name__ == "__main__":
     #print(logfile_datetime)
     #exit(0)
 
-    logger.add(f"output-{sys.argv[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
+    logger.add(f"output-{sys.argv[0].split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
 
     with open(sys.argv[1], 'r') as myfile:
         query1 = myfile.read()
@@ -215,6 +215,7 @@ if __name__ == "__main__":
     print_buffer()
     query_no_comments = remove_comments(query1)
 
+    logger.info(f"query1: {query1}")
     #logger.info(find_sub_queries(query_no_comments))
 
     # get tables
