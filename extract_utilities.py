@@ -112,8 +112,13 @@ def get_matching_where_position(sql_str, from_pos):
             logger.info(f"paren found in token {index}     paren_level = {paren_level}")
             if paren_level == -1 or (paren_level == 0 and open_paren_found): # either closing paren for subquery already open or end of subquery after FROM
                 logger.info(f"ending paren found in token {index}   need to match correct string {tokens[index - 4:index + 1]}")
-                match_string = " ".join(tokens[index - 2:index + 2]) # assume at least 3 tokens before closing paren encountered
-                logger.info(f"match_string: {match_string}")
+                logger.info(f"len(tokens): {len(tokens)}")
+                if index < 5:
+                    match_string = " ".join(tokens[:index + 2])
+                    logger.info(f"match_string1: {match_string}")
+                else:
+                    match_string = " ".join(tokens[index - 2:index + 1]) # assume at least 3 tokens before closing paren encountered
+                    logger.info(f"match_string2: {match_string}")
                 match_string_location = sql_str.find(match_string) + len(match_string) - 1
                 logger.info(f"match_string location: {match_string_location}   --{sql_str[match_string_location - 2: match_string_location + 2]}--")
                 logger.info(f"match_string location: {match_string_location}   ++{sql_str[match_string_location]}++")
@@ -123,10 +128,10 @@ def get_matching_where_position(sql_str, from_pos):
             logger.info(f"UNION found in token {index}")
             logger.info(f"select_level: {select_level}")
             if select_level == 1 and paren_level == 0:
-                match_string = " ".join(tokens[index - 2:index + 2]) # assume at least 3 tokens before UNION encountered. using +2 because we started on index 1
+                match_string = " ".join(tokens[index - 1:index + 2]) # assume at least 3 tokens before UNION encountered. using +2 because we started on index 1
                 logger.info(f"match_string: {match_string}")
-                match_string_location = sql_str.find(match_string) + len(match_string) - 1
-                logger.info(f"match_string location: {match_string_location}   --{sql_str[match_string_location - 2: match_string_location + 2]}--")
+                match_string_location = sql_str.find(match_string) + len(match_string) - 5
+                logger.info(f"match_string location: {match_string_location}   --{sql_str[match_string_location - 4: match_string_location + 4]}--")
                 logger.info(f"match_string location: {match_string_location}   ++{sql_str[match_string_location]}++")
                 matching_where_position = from_pos + match_string_location
                 break
