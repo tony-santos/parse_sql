@@ -49,12 +49,13 @@ def get_tables(sql_str, from_clause):
     #     logger.info(f"from_clause2: {from_clause}")
     
     if from_clause[0] == '(': # from clause is a  subquery
-        logger.info(f"from_clause is a subquery. skip processing")
+        logger.info(f"from_clause is a subquery. get subquery alias and add to table_entries")
         subquery_alias = get_subquery_alias(sql_str, from_clause)
         table_entries.append(('SUBQUERY', subquery_alias))
-        return table_entries
+        from_clause = from_clause[get_matching_paren_position(from_clause) + 1:]
+        # return table_entries
         # from_clause = from_clause[1:closing_paren_pos].lstrip().rstrip() # strip off opening and closing parens
-        # logger.info(f"after stripping parens: +++{from_clause}+++")
+        logger.info(f"after removing subquery: +++{from_clause}+++")
 
     
     # left off here. need to figure out what kind of table list has been passed. if simple list separated by commas or combination of different JOIN keywords
@@ -98,6 +99,7 @@ def process_other_join_types(from_clause):
                 #logger.info(f"adding1: {table_line_raw[:table_line_raw.find(' LEFT')].rstrip().upper()}")
                 #table_lines.append(table_line_raw[:table_line_raw.find(' LEFT')].rstrip().upper()) # get line up to, but not including LEFT. should also remove LEFT OUTER
                 table_line_raw = table_line_raw[:table_line_raw.find(' LEFT')].rstrip().upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
+                logger.info(f"table_line_raw2b: {table_line_raw}")
         # look for LEFT & LEFT OUTER
         elif table_line_raw.find(' RIGHT') > -1:
             logger.info("found RIGHT or RIGHT OUTER JOIN")
@@ -107,6 +109,7 @@ def process_other_join_types(from_clause):
                 #logger.info(f"adding2: {table_line_raw[:table_line_raw.find(' RIGHT')].rstrip().upper()}")
                 #table_lines.append(table_line_raw[:table_line_raw.find(' RIGHT')].rstrip().upper()) # get line up to, but not including LEFT. should also remove LEFT OUTER
                 table_line_raw = table_line_raw[:table_line_raw.find(' RIGHT')].rstrip().upper() # get line up to, but not including LEFT. should also remove LEFT OUTER
+                logger.info(f"table_line_rawsb: {table_line_raw}")
     #        table_line2 = re.search('(LEFT JOIN (.+?) ON ', table_line2, re.DOTALL).group(1)
     # ON and join condition will be on next line. need to check separately at same level as check for LEFT
         if table_line_raw.find(' ON ') > -1:
@@ -150,6 +153,74 @@ def create_table_entries(table_entries):
     
     return table_list
 
+def get_tables_after_from(sql_str):
+    sql_str = sql_str.upper()
+    table_list = []
+
+    new_from_location = prev_from_location = sql_str.find(' FROM ')
+    while new_from_location> -1:
+        sql_str = sql_str[new_from_location:].lstrip().rstrip()
+        logger.info(f"sql_str = +++{sql_str}+++")
+        if sql_str.startswith('('):
+            # ( after FROM or JOIN is a subquery)
+            logger.info(f"subquery found. getting subquery alias and adding to table_list")
+            end_pos = get_matching_paren_position(sql_str, 0)
+            subquery = sql_str[new_from_location + 6:end_pos]
+            subquery_alias = get_subquery_alias(sql_str, subquery)
+            table_list.append(('SUBQUERY', subquery_alias))
+            # get table names next to JOIN keywords
+            start_pos = end_pos + 1
+
+        join_pos = sql_str.find(' JOIN ')
+        while join_pos > -1:
+            table_list.append(get_table_next_to_join(sql_str, join_pos))
+            join_pos = sql_str.find(' JOIN ', join_pos + 6)
+
+        # get location of next from
+        prev_from_location = new_from_location
+        new_from_location = sql_str.find(' FROM ', prev_from_location)
+    logger.info(f"returning from get_tables_after_from")
+    logger.info(f"table_list: {table_list}")
+
+    return table_list
+
+def get_table_next_to_join(sql_str, join_pos):
+    logger.info(f"entering get_table_next_to_join: sql_str: +++{sql_str[join_pos:join_pos + 100]}+++")
+    tokens = sql_str[join_pos:].split()[0:4]
+    logger.info(f"tokens: {tokens}")
+    if tokens[0] == 'JOIN':
+        tokens = tokens[1:] # drop 1st token
+
+    table_name = tokens[0]
+
+    #check for alias
+    if tokens[1] == 'ON': # no alias
+        table_alias = table_name
+    elif tokens[1] == 'AS': # next token is the alias
+        table_alias = tokens[2]
+    else:
+        table_alias = tokens1
+
+    return [(table_name, table_alias)]
+
+def get_table(sql_str, start_pos=0):
+    # immediately after from are tables
+    # they can be found after keywords FROM and JOIN
+    sql_str = sql_str[start_pos:].lstrip().rstrip()
+    logger.info(f"sql_str = +++{sql_str}+++")
+    if sql_str.startswith('('):
+        # ( after FROM or JOIN is a subquery)
+        end_pos = get_matching_paren_position(sql_str, 0)
+        subquery_alias = get_subquery_alias(sql_str, from_clause)
+        table_list.append(('SUBQUERY', subquery_alias))
+        # get table names next to JOIN keywords
+        start_pos = end_pos + 1
+    join_pos = sql_str.find(' JOIN ', start_pos)
+    while join_pos > -1:
+        table_list.append = get_table_next_to_join(sql_str, join_pos)
+        join_pos = sql_str.find(' JOIN ', join_pos + 6)
+
+    return table_list
 
 def process_subquery(table_entry):
     """extracts table names from subqueries
@@ -305,6 +376,7 @@ if __name__ == "__main__":
     # sql_str = query1
     sql_str = query_single_spaces
     logger.info(f"sql_str: {sql_str}")
+    get_tables_after_from(sql_str)
     # while there are more queries/subqueries, get columns
     while more_selects(sql_str, select_position + 6):
         select_position = get_select_position(sql_str, select_position + 6)
@@ -326,6 +398,8 @@ if __name__ == "__main__":
         else:
             break
     field_entries = []
+    parsed_fields = []
+    tables = []
     logger.info(f"select_count = {select_count}")
     logger.info(f"select_from_wheres: {select_from_wheres}")
     for select_from_where in select_from_wheres:
@@ -344,18 +418,18 @@ if __name__ == "__main__":
             logger.info(f"sql_str part2: +++{sql_str[from_pos: from_pos + 80]} ... {sql_str[where_pos - 80: where_pos + 5 ]}+++")
     
         logger.info(f"calling get_tables:")
-        tables = get_tables(sql_str, sql_str[from_pos + 4: where_pos])
+        tables.extend(get_tables(sql_str, sql_str[from_pos + 4: where_pos]))
         logger.info(f"tables: {tables}")
         logger.info(f"calling split_fields:")
         field_list = split_fields(sql_str[select_pos+6: from_pos])
-        parsed_fields = [parse_field(field) for field in field_list]
+        parsed_fields.extend([parse_field(field) for field in field_list])
         logger.info(f"fields: {field_list}")
         logger.info(f"parsed_fields: {parsed_fields}")
-        entries = merge_tables_columns(tables, parsed_fields)
-        logger.info(f"entries: {entries}")
+
+    entries = merge_tables_columns(tables, parsed_fields)
+    logger.info(f"entries: {entries}")
     field_entries.append(entries)
         # columns.append()
-    logger.info(f"field_entries: {field_entries}")
     exit(0)
     #logger.info(find_sub_queries(query_no_comments))
 

@@ -113,9 +113,10 @@ def get_matching_where_position(sql_str, from_pos):
         elif token == ')':
             paren_level = paren_level - 1
             logger.info(f"paren found in token {index}     paren_level = {paren_level}")
-            if paren_level == -1 or (paren_level == 0 and open_paren_found): # either closing paren for subquery already open or end of subquery after FROM
+            if paren_level == -1: # or (paren_level == 0 and open_paren_found): # either closing paren for subquery already open or end of subquery after FROM
                 logger.info(f"ending paren found in token {index}   need to match correct string {tokens[index - 4:index + 1]}")
                 logger.info(f"len(tokens): {len(tokens)}")
+                logger.info(f"paren_level: {paren_level}     open_paren_found: {open_paren_found}")
                 if index < 5:
                     match_string = " ".join(tokens[:index + 2])
                     logger.info(f"match_string1: {match_string}")
@@ -154,11 +155,18 @@ def get_matching_where_position(sql_str, from_pos):
             logger.info(f"WHERE found in token: {index}")
             where_position = sql_str.find('WHERE')
             from_level = from_level - 1
-            logger.info(f"FROM found. select_level: {select_level}")
+            logger.info(f"WHERE found. from_level: {from_level}")
 
             if from_level == 0:
+                logger.info(f"found WHERE and from_level ==0")
                 matching_where_position = from_pos + where_position
                 break
+        elif token == ';':
+            logger.info(f"ending ';' found")
+            where_position = sql_str.find(' ; ')
+            matching_where_position = from_pos + where_position
+            break
+
     logger.info(f"select_level: {select_level}")
     logger.info(f"returning from get_matching_where_position.      matching_where_position: {matching_where_position} end of from clause: {orig_sql_str[matching_where_position - 20:matching_where_position]}+++")
     return matching_where_position
@@ -231,6 +239,12 @@ def merge_tables_columns(tables, columns):
     logger.info(f"columns: {columns}")
     for table_name, table_table_alias in tables:
         table_dict[table_table_alias] = (table_name, table_table_alias)
+        if table_name.find('.') > -1: # split scema name from table name
+            logger.info(f"{table_name} contains schema name. splitting and adding second entry")
+            schema_name, split_table_name = table_name.split('.')
+            table_dict[split_table_name] = table_table_alias
+    for key, value in table_dict.items():
+        logger.info(f"key: +++{key}+++   value: +++{value}+++")
     for table_alias, column_name, field_name in columns:
         logger.info(f"table_alias = {table_alias},   column_name = {column_name},   field_name = {field_name}")
         if table_alias == '':
