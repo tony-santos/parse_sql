@@ -223,7 +223,47 @@ def parse_field(field):
         alias = column_name
     return (table_name, column_name, alias)
 
+def merge_tables_columns(tables, columns):
+    entries = []
+    table_dict = {}
+    logger.info(f"entering merge_tables-columns...")
+    logger.info(f"tables: {tables}")
+    logger.info(f"columns: {columns}")
+    for table_name, table_table_alias in tables:
+        table_dict[table_table_alias] = (table_name, table_table_alias)
+    for table_alias, column_name, field_name in columns:
+        logger.info(f"table_alias = {table_alias},   column_name = {column_name},   field_name = {field_name}")
+        if table_alias == '':
+            if len(tables) == 1: # all columns belong to same table (expected)
+                logger.info(f"no table alias. all columns belong to: {tables[0][0]}")
+                table_name, table_alias = tables[0]
+                entries.append((field_name, table_name, column_name))
+            else: # no table alias but multiple tables. might leave table_name blank
+                logger.info(f"no table alias and multiple tables. not sure how to resolve. leaving table name blank for {field_name}")
+                entries.append((field_name, '', column_name))
+        else: # lookup table by alias
+            table_name, table_table_alias = table_dict[table_alias]
+            entries.append((field_name, table_name, column_name))
+    return entries
 
+def get_subquery_alias(sql_str, subquery):
+    # to get subquery_alias, find subquery in sql_str, take string from end of subquery to end of sql_str, split, take first token (unless ), then take second token
+    sql_str = sql_str.upper()
+    subquery = subquery.upper()
+    start_pos = sql_str.find(subquery) + len(subquery) + 1 # should be ) or space
+    rest_of_query = sql_str[start_pos:]
+    rest_of_query_tokens = rest_of_query.split()
+    logger.info(f"rest_of_query: {rest_of_query}")
+    logger.info(f"first few tokens: {rest_of_query_tokens[0:3]}")
+    for token in rest_of_query_tokens:
+        if token == ')':
+            continue
+        else:
+            subquery_alias = token
+            break
+    
+    return subquery_alias
+        
 
 if __name__ == "__main__":
     

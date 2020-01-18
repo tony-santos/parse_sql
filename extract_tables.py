@@ -21,7 +21,7 @@ from extract_utilities import *
 
 
 
-def get_tables(sql_str):
+def get_tables(sql_str, from_clause):
     """extract table names from sql query
     
     might need multiple passes to get all table names and may lead to additional columns being found
@@ -33,7 +33,7 @@ def get_tables(sql_str):
         they were part of the query
     """
     # start with text between FROM and WHERE or between FROM and ';' and return list of tables by splitting on ',' 
-    from_clause = sql_str.upper().lstrip().rstrip()
+    from_clause = from_clause.upper().lstrip().rstrip()
     logger.info(f"entering get_tables - from_clause: +++{from_clause}+++")
     table_entries = []
     # rest_of_query = get_rest_after_main_select(sql_str)
@@ -50,6 +50,8 @@ def get_tables(sql_str):
     
     if from_clause[0] == '(': # from clause is a  subquery
         logger.info(f"from_clause is a subquery. skip processing")
+        subquery_alias = get_subquery_alias(sql_str, from_clause)
+        table_entries.append(('SUBQUERY', subquery_alias))
         return table_entries
         # from_clause = from_clause[1:closing_paren_pos].lstrip().rstrip() # strip off opening and closing parens
         # logger.info(f"after stripping parens: +++{from_clause}+++")
@@ -323,7 +325,7 @@ if __name__ == "__main__":
             # sql_str = sql_str[select_position + 6:]
         else:
             break
-    
+    field_entries = []
     logger.info(f"select_count = {select_count}")
     logger.info(f"select_from_wheres: {select_from_wheres}")
     for select_from_where in select_from_wheres:
@@ -342,12 +344,18 @@ if __name__ == "__main__":
             logger.info(f"sql_str part2: +++{sql_str[from_pos: from_pos + 80]} ... {sql_str[where_pos - 80: where_pos + 5 ]}+++")
     
         logger.info(f"calling get_tables:")
-        tables = get_tables(sql_str[from_pos + 4: where_pos])
+        tables = get_tables(sql_str, sql_str[from_pos + 4: where_pos])
         logger.info(f"tables: {tables}")
         logger.info(f"calling split_fields:")
-        fields = split_fields(sql_str[select_pos+6: from_pos])
-        logger.info(f"fields: {fields}")
+        field_list = split_fields(sql_str[select_pos+6: from_pos])
+        parsed_fields = [parse_field(field) for field in field_list]
+        logger.info(f"fields: {field_list}")
+        logger.info(f"parsed_fields: {parsed_fields}")
+        entries = merge_tables_columns(tables, parsed_fields)
+        logger.info(f"entries: {entries}")
+    field_entries.append(entries)
         # columns.append()
+    logger.info(f"field_entries: {field_entries}")
     exit(0)
     #logger.info(find_sub_queries(query_no_comments))
 
