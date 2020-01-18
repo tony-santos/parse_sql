@@ -33,21 +33,31 @@ def get_tables(sql_str):
         they were part of the query
     """
     # start with text between FROM and WHERE or between FROM and ';' and return list of tables by splitting on ',' 
-    sql_str = sql_str.upper().lstrip().rstrip()
-    rest_of_query = get_rest_after_main_select(sql_str)
-    logger.info(f"rest_of_query: {rest_of_query}")
-    if rest_of_query[-1] == ';':
-        rest_of_query = rest_of_query[:-1] 
+    from_clause = sql_str.upper().lstrip().rstrip()
+    logger.info(f"entering get_tables - from_clause: +++{from_clause}+++")
+    table_entries = []
+    # rest_of_query = get_rest_after_main_select(sql_str)
+    # logger.info(f"rest_of_query: {rest_of_query}")
+    # if rest_of_query[-1] == ';':
+    #     rest_of_query = rest_of_query[:-1] 
 
-    logger.info(f"rest_of_query2: {rest_of_query}")
-    from_clause = rest_of_query
-    logger.info(f"from_clause1: {from_clause}")
-    if from_clause.find('WHERE') > 0:
-        from_clause = from_clause[:from_clause.find('WHERE')]
-        logger.info(f"from_clause2: {from_clause}")
+    # logger.info(f"rest_of_query2: {rest_of_query}")
+    # from_clause = rest_of_query
+    # logger.info(f"from_clause1: {from_clause}")
+    # if from_clause.find('WHERE') > 0:
+    #     from_clause = from_clause[:from_clause.find('WHERE')]
+    #     logger.info(f"from_clause2: {from_clause}")
+    
+    if from_clause[0] == '(': # from clause is a  subquery
+        logger.info(f"from_clause is a subquery. skip processing")
+        return table_entries
+        # from_clause = from_clause[1:closing_paren_pos].lstrip().rstrip() # strip off opening and closing parens
+        # logger.info(f"after stripping parens: +++{from_clause}+++")
+
     
     # left off here. need to figure out what kind of table list has been passed. if simple list separated by commas or combination of different JOIN keywords
     if from_clause.find('JOIN') == -1: # should be simple list of tables separated by comma
+        logger.info(f"JOIN not found. should be simple list of tables separated by comma")
         table_lines = from_clause.split(',')
     else: # since the word JOIN was found, assume it  is a series of LEFT, RIGHT, INNER, or OUTER JOINS
         table_lines = process_other_join_types(from_clause)
@@ -68,7 +78,7 @@ def process_other_join_types(from_clause):
     """
     print_buffer()
     print_buffer()
-    logger.info(from_clause)
+    logger.info(f"entering process_other_join_types. from_clause: {from_clause}")
     table_lines_raw = from_clause.split(' JOIN') # after splitting on JOIN, all table lines except last should have extra keywords at the end to be removed
     table_lines_raw2 = [table_line.lstrip().rstrip() for table_line in table_lines_raw]
   
@@ -129,6 +139,8 @@ def create_table_entries(table_entries):
         elif table_entry.upper().find(' ') > -1: # table entry contains a space. probably has a table alias after space
             logger.info(f"table_entry {table_entry.upper()} contains a space. look for alias")
             table_name, table_alias = table_entry.upper().split()
+            if table_alias == ')':
+                table_alias = table_name
         else:
             table_name = table_alias = table_entry.lstrip().rstrip()
  
@@ -281,7 +293,7 @@ if __name__ == "__main__":
 
     actual_select_position = 0
     actual_from_position = 0
-    select_position = -6
+    select_position = -6 # initialize to -6 so 1st pass will start at position 0
     from_position = 0
 
 # does it make sense to replace all whitespace with spaces to make finding substring by joining tokens easier? going to try
@@ -303,11 +315,11 @@ if __name__ == "__main__":
             select_count = select_count + 1
             # select_from_pairs.append((actual_select_position, actual_from_position))
             select_from_wheres.append((select_position, from_position, where_position))
-            fields = split_fields(sql_str[select_position + 6:from_position])
-            logger.info(f"fields: {fields}")
-            new_columns = [parse_field(field) for field in fields]
-            logger.info(f"new_columns: {new_columns}")
-            columns.extend(new_columns)
+            # fields = split_fields(sql_str[select_position + 6:from_position])
+            # logger.info(f"fields: {fields}")
+            # new_columns = [parse_field(field) for field in fields]
+            # logger.info(f"new_columns: {new_columns}")
+            # columns.extend(new_columns)
             # sql_str = sql_str[select_position + 6:]
         else:
             break
@@ -318,14 +330,24 @@ if __name__ == "__main__":
         select_pos, from_pos, where_pos = select_from_where
         logger.info(f"select_pos: {select_pos},   from_pos: {from_pos},   where_pos: {where_pos}")
         if from_pos - select_pos < 200:
-            logger.info(f"sql_str part1: {sql_str[select_pos: from_pos+4]}")
+            logger.info(f"sql_str part1a: +++{sql_str[select_pos: from_pos+4]}+++")
+            logger.info(f"sql_str part1b: +++{sql_str[select_pos+6: from_pos]}+++")
         else:
             logger.info(f"sql_str part1: {sql_str[select_pos: select_pos + 80]} ... {sql_str[from_pos - 80: from_pos + 4 ]}")
 
         if where_pos - from_pos < 200:
-            logger.info(f"sql_str part2: {sql_str[from_pos: where_pos+5]}")
+            logger.info(f"sql_str part2: +++{sql_str[from_pos: where_pos+5]}+++")
+            logger.info(f"sql_str part2a: +++{sql_str[from_pos + 4: where_pos]}+++")
         else:
-            logger.info(f"sql_str part2: {sql_str[from_pos: from_pos + 80]} ... {sql_str[where_pos - 80: where_pos + 5 ]}")
+            logger.info(f"sql_str part2: +++{sql_str[from_pos: from_pos + 80]} ... {sql_str[where_pos - 80: where_pos + 5 ]}+++")
+    
+        logger.info(f"calling get_tables:")
+        tables = get_tables(sql_str[from_pos + 4: where_pos])
+        logger.info(f"tables: {tables}")
+        logger.info(f"calling split_fields:")
+        fields = split_fields(sql_str[select_pos+6: from_pos])
+        logger.info(f"fields: {fields}")
+        # columns.append()
     exit(0)
     #logger.info(find_sub_queries(query_no_comments))
 

@@ -59,6 +59,7 @@ def get_select_position(sql_str, start_pos=0):
 def get_matching_from_position(sql_str, start_pos=0):
     logger.info(f"entering get_matching_from_position: start_pos: {start_pos}")
     # make copy of sql_str
+    orig_sql_str = sql_str
     sql_str = sql_str.upper()[start_pos:]
     select_level = 1
     matching_from_position = -1
@@ -81,6 +82,7 @@ def get_matching_from_position(sql_str, start_pos=0):
                 logger.info(f"match_string location: {matching_from_position}   --{sql_str[matching_from_position - 5: matching_from_position + 5]}--")
                 logger.info(f"match_string location: {matching_from_position}   ++{sql_str[matching_from_position:matching_from_position+5]}++")
                 matching_where_position = start_pos + matching_from_position
+                logger.info(f"orig_sql_str[matching_where_position] = +++{orig_sql_str[matching_where_position]}+++")
                 break
     logger.info(f"select_level: {select_level}")
     matching_from_position = matching_from_position + start_pos
@@ -94,6 +96,7 @@ def get_matching_where_position(sql_str, from_pos):
     logger.info(f"entering get_matching_where_position: from_pos: {from_pos}")
     logger.info(f"sql_str: {sql_str[from_pos: from_pos + 130]}")
     # make copy of sql_str
+    orig_sql_str = sql_str
     sql_str = sql_str.upper()[from_pos:]
     select_level = 1
     from_level = 0
@@ -122,7 +125,7 @@ def get_matching_where_position(sql_str, from_pos):
                 match_string_location = sql_str.find(match_string) + len(match_string) - 1
                 logger.info(f"match_string location: {match_string_location}   --{sql_str[match_string_location - 2: match_string_location + 2]}--")
                 logger.info(f"match_string location: {match_string_location}   ++{sql_str[match_string_location]}++")
-                matching_where_position = from_pos + match_string_location
+                matching_where_position = from_pos + match_string_location + 1
                 break
         elif token =='UNION': # should be matching where position if select_level == 1
             logger.info(f"UNION found in token {index}")
@@ -157,7 +160,7 @@ def get_matching_where_position(sql_str, from_pos):
                 matching_where_position = from_pos + where_position
                 break
     logger.info(f"select_level: {select_level}")
-    logger.info(f"returning from get_matching_where_position.      matching_where_position: {matching_where_position}")
+    logger.info(f"returning from get_matching_where_position.      matching_where_position: {matching_where_position} end of from clause: {orig_sql_str[matching_where_position - 20:matching_where_position]}+++")
     return matching_where_position
 
 def get_from_position(sql_str, start_pos=0):
