@@ -222,6 +222,11 @@ def get_table(sql_str, start_pos=0):
 
     return table_list
 
+def process_subquery2(table_entry):
+    logger.info(f"entering process_subquery2: table_entry: +++{table_entry}+++")
+    exit(0)
+
+#i think process_subquer does too much. just return ('subquery', subquery_alias)
 def process_subquery(table_entry):
     """extracts table names from subqueries
 
@@ -244,6 +249,7 @@ def process_subquery(table_entry):
     logger.info(f"subquery_alias for table_entry: {subquery_alias}")
     logger.info(f"table_entry after removing ')': {table_entry}")
     logger.info(f"length of table_entry after removing ')': {len(table_entry)}")
+
     # get part after FROM
     logger.info(f"position of 'FROM': {table_entry.upper().find('FROM')}")
     table_entry = table_entry.upper().lstrip().rstrip()
@@ -260,7 +266,8 @@ def process_subquery(table_entry):
         subqueries = table_entry.upper().split('UNION')
         for subquery in subqueries:
             logger.info(f"calling process_subquery with: {subquery}")
-            table_entries.extend(process_subquery(subquery))
+            table_entries.extend(process_subquery2(subquery))
+            # table_entries.extend(process_subquery(subquery))
     else:
         if from_clause.find('WHERE') > 0:
             from_clause = from_clause[:from_clause.find('WHERE')]
@@ -376,7 +383,7 @@ if __name__ == "__main__":
     # sql_str = query1
     sql_str = query_single_spaces
     logger.info(f"sql_str: {sql_str}")
-    get_tables_after_from(sql_str)
+    # get_tables_after_from(sql_str)
     # while there are more queries/subqueries, get columns
     while more_selects(sql_str, select_position + 6):
         select_position = get_select_position(sql_str, select_position + 6)

@@ -10,6 +10,8 @@ def remove_comments(sql_str):
 
     # remove the /* */ comments
     q = re.sub(r"/\*[^*]*\*+(?:[^*/][^*]*\*+)*/", "", sql_str)
+    logger.info(f"after 1st pass:")
+    logger.info(sql_str)
 
     # remove whole line -- and # comments
     lines = [line for line in q.splitlines() if not re.match("^\s*(--|#)", line)]
@@ -20,7 +22,8 @@ def remove_comments(sql_str):
 #    print_buffer()
 
     # remove trailing -- and # comments
-    q = " ".join([re.split("--|#", line)[0] for line in lines])
+    # q = " ".join([re.split("--|#", line)[0] for line in lines])
+    q = " ".join([re.split("--#", line)[0] for line in lines])
 
     return q
 
@@ -183,15 +186,15 @@ def get_from_position(sql_str, start_pos=0):
             logger.info(f"sql_str: {sql_str[:from_position]}")
 
 def get_matching_paren_position(sql_str, open_paren_position=0):
-    paren_level = 1
+    paren_level = 0
     matching_paren_position = -1
-    for char, index in enumerate(sql_str):
+    for index, char in enumerate(sql_str):
         if char == '(':
             paren_level = paren_level + 1
-            logger.info(f"another opening paren found. paren_level: {paren_count}")
+            logger.info(f"another opening paren found. paren_level: {paren_level}")
         elif char== ')':
             paren_level = paren_level - 1
-            logger.info(f"closing paren found. paren_level: {paren_count}")
+            logger.info(f"closing paren found. paren_level: {paren_level}")
             if paren_level == 0:
                 matching_paren_position = index
                 break
@@ -200,6 +203,7 @@ def get_matching_paren_position(sql_str, open_paren_position=0):
     return matching_paren_position
 
 def parse_field(field):
+    logger.info(f"entering parse_field: field = {field}")
     table_name, column_name, alias = '', '', ''
     field = field.upper().lstrip()
     if field.upper().find(' AS ') == -1: # AS not found in string
@@ -209,13 +213,14 @@ def parse_field(field):
             column_name = field
     else:
         source = re.search('(.+?) AS ', field, re.DOTALL)
-        #print("source: ", source.group(1))
-        #print("---", source.group(1).upper()[0])
+        logger.info(f"type(source.group(1)): {type(source.group(1))}")
+        logger.info(f"source: {source.group(1)}")
+        logger.info("---", source.group(1).upper()[0])
         if source:
             # check for function names
             if source.group(1).startswith('CASE') or source.group(1).lstrip().startswith('ROUND') \
                 or source.group(1).startswith("'") or source.group(1).startswith('"'):
-                table_name = ''
+                table_name = 'DERIVED'
                 column_name = source.group(1)
             else: 
                 if source.group(1).find('.') > -1:
@@ -226,7 +231,7 @@ def parse_field(field):
             
             #alias  = re.search(' AS (.+?)', field.upper(), re.DOTALL).group(1)
             alias  = field[field.find(' AS ') + 4:]
-    print(f"alias: {alias}, {len(alias)}")
+    logger.info(f"alias: {alias}, {len(alias)}")
     if len(alias) == 0:
         alias = column_name
     return (table_name, column_name, alias)
@@ -264,7 +269,10 @@ def get_subquery_alias(sql_str, subquery):
     # to get subquery_alias, find subquery in sql_str, take string from end of subquery to end of sql_str, split, take first token (unless ), then take second token
     sql_str = sql_str.upper()
     subquery = subquery.upper()
+    logger.info(f"sql_str: +++{sql_str}+++")
+    logger.info(f"subquery: +++{sql_str}+++")
     start_pos = sql_str.find(subquery) + len(subquery) + 1 # should be ) or space
+    logger.info(f"start_pos: {start_pos}")
     rest_of_query = sql_str[start_pos:]
     rest_of_query_tokens = rest_of_query.split()
     logger.info(f"rest_of_query: {rest_of_query}")
@@ -277,7 +285,161 @@ def get_subquery_alias(sql_str, subquery):
             break
     
     return subquery_alias
-        
+
+def more_selects(sql_str, start_pos=0):
+    return sql_str[start_pos:].upper().find('SELECT') > -1
+
+def split_fields(fields_string, separator=','):
+    """
+    splits a string using separator unless the separator is within parentheses
+    takes string of fields
+
+    returns list of fields
+    """
+    logger.info(f"entering split_fields: fields_string = {fields_string} len(fields_string) = {len(fields_string)}")
+    fields = []
+    parenthesis_count = 0
+    current_field = ''
+    for char in fields_string.lstrip().rstrip():
+        if char == ',' and parenthesis_count == 0: # split here by appending current field to fields and setting current_field to empty string
+            fields.append(current_field)
+            logger.info(f"appending: {current_field}")
+            current_field = ''
+        else:
+            current_field = current_field + char
+            if char == '(':
+                parenthesis_count = parenthesis_count + 1
+            elif char == ')':
+                parenthesis_count = parenthesis_count - 1
+    
+    # add last field if it was not already added to fields
+    if current_field != fields[-1]:
+        logger.info(f"appending last field: {current_field}")
+        fields.append(current_field.lstrip().rstrip())
+
+    logger.info(f"fields: {fields}")
+    return fields
+            
+# def get_tables_after_from(sql_str):
+#     sql_str = sql_str.upper()
+#     table_list = []
+
+#     new_from_location = prev_from_location = sql_str.find('FROM ')
+#     after_from = sql_str
+#     start_pos = end_pos = 0
+#     while new_from_location > -1:
+#         logger.info(f"new_from_location: {new_from_location}")
+#         after_from = sql_str[new_from_location+len('FROM '):].lstrip().rstrip()
+#         logger.info(f"after_from = +++{after_from}+++")
+#         if after_from.startswith('('):
+#             # ( after FROM or JOIN is a subquery)
+#             logger.info(f"subquery found. getting subquery alias and adding to table_list")
+#             end_pos = get_matching_paren_position(after_from, 0)
+#             subquery = after_from[:end_pos+1]
+#             logger.info(f"subquery: +++{subquery}+++")
+#             subquery_alias = get_subquery_alias(sql_str, subquery)
+#             table_list.append(('SUBQUERY', subquery_alias))
+#             # get table names next to JOIN keywords
+#             start_pos = end_pos + 1
+
+#         join_pos = sql_str.find(' JOIN ', start_pos, end_pos)
+#         while join_pos > -1:
+#             logger.info(f"join_pos: {join_pos}")
+#             table_list.append(get_table_next_to_join(sql_str, join_pos))
+#             join_pos = sql_str.find(' JOIN ', join_pos + 6)
+
+#         # get location of next from
+#         prev_from_location = new_from_location
+#         new_from_location = sql_str.find(' FROM ', prev_from_location+1) # need +1 to not match same substring
+#         logger.info(f"prev_from_location: {prev_from_location}")
+#         logger.info(f"new_from_location: {new_from_location}")
+#     logger.info(f"returning from get_tables_after_from")
+#     logger.info(f"table_list: {table_list}")
+#     exit(0)
+#     return table_list
+
+def get_tables_after_froms(sql_str, select_froms):
+    sql_str = sql_str.upper()
+    table_list = []
+
+    new_from_location = prev_from_location = sql_str.find('FROM ')
+    after_from = sql_str
+    start_pos = end_pos = 0
+    for new_select_location, new_from_location in select_froms:
+        logger.info(f"new_from_location: {new_from_location}")
+        after_from = sql_str[new_from_location+len('FROM '):].lstrip().rstrip()
+        logger.info(f"after_from = +++{after_from}+++")
+        if after_from.startswith('('):
+            # ( after FROM or JOIN is a subquery)
+            logger.info(f"subquery found. getting subquery alias and adding to table_list")
+            end_pos = get_matching_paren_position(after_from, 0)
+            subquery = after_from[:end_pos+1]
+            logger.info(f"subquery: +++{subquery}+++")
+            subquery_alias = get_subquery_alias(sql_str, subquery)
+            table_list.append(('SUBQUERY', subquery_alias))
+            # get table names next to JOIN keywords
+            start_pos = end_pos + 1
+        else:  # should be a table
+            logger.info(f"table found. getting table entry and adding to table_list")
+            table_list.append(get_table_next_to_from(sql_str, new_from_location))
+
+        join_pos = sql_str.find(' JOIN ', start_pos, end_pos)
+        while join_pos > -1:
+            logger.info(f"join_pos: {join_pos}")
+            table_list.append(get_table_next_to_join(sql_str, join_pos))
+            join_pos = sql_str.find(' JOIN ', join_pos + 6)
+
+        # get location of next from
+        prev_select_location = new_select_location
+        prev_from_location = new_from_location
+        # new_from_location = sql_str.find(' FROM ', prev_from_location+1) # need +1 to not match same substring
+        logger.info(f"prev_select_location: {prev_select_location}")
+        logger.info(f"prev_from_location: {prev_from_location}")
+    logger.info(f"returning from get_tables_after_froms")
+    logger.info(f"table_list: {table_list}")
+
+    return table_list
+
+def get_table_next_to_from(sql_str, from_pos): # does not handle subqueries
+    logger.info(f"entering get_table_next_to_from: sql_str: +++{sql_str[from_pos:from_pos + 100]}+++")
+    tokens = sql_str[from_pos:].split()[0:4]
+    logger.info(f"tokens: {tokens}")
+    if tokens[0] == 'FROM':
+        tokens = tokens[1:] # drop 1st token
+
+    table_name = tokens[0]
+
+    #check for alias
+    if tokens[1] in ['ON', 'UNION', 'LEFT', 'RIGHT', 'WHERE', ')']: # no alias
+        table_alias = table_name
+    elif tokens[1] == 'AS': # next token is the alias
+        table_alias = tokens[2]
+    else:
+        table_alias = tokens[1]
+
+    return (table_name, table_alias)
+
+def get_table_next_to_join(sql_str, join_pos): # does not handle subqueries
+    logger.info(f"entering get_table_next_to_from: join_pos = {join_pos}")
+    logger.info(f"entering get_table_next_to_from: sql_str: +++{sql_str[join_pos:join_pos + 100]}+++")
+    tokens = sql_str[join_pos:].split()[0:4]
+    logger.info(f"tokens: {tokens}")
+    if tokens[0] == 'JOIN':
+        tokens = tokens[1:] # drop 1st token
+
+    table_name = tokens[0]
+
+    #check for alias
+    if tokens[1] in ['ON', 'UNION', 'LEFT', 'RIGHT', 'WHERE', ')']: # no alias
+        table_alias = table_name
+    elif tokens[1] == 'AS': # next token is the alias
+        table_alias = tokens[2]
+    else:
+        table_alias = tokens[1]
+
+    return (table_name, table_alias)
+
+
 
 if __name__ == "__main__":
     
