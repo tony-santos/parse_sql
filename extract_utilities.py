@@ -15,14 +15,10 @@ def remove_comments(sql_str):
 
     # remove whole line -- and # comments
     lines = [line for line in q.splitlines() if not re.match("^\s*(--|#)", line)]
-#    print_buffer()
-
-#    for line in lines:
-#        print(line)
-#    print_buffer()
 
     # remove trailing -- and # comments
     # q = " ".join([re.split("--|#", line)[0] for line in lines])
+    # 2020-01-20: removed | from regex because it was splitting column containing concatenation (||)
     q = " ".join([re.split("--#", line)[0] for line in lines])
 
     return q
