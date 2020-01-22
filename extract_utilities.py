@@ -19,9 +19,42 @@ def remove_comments(sql_str):
     # remove trailing -- and # comments
     # q = " ".join([re.split("--|#", line)[0] for line in lines])
     # 2020-01-20: removed | from regex because it was splitting column containing concatenation (||)
-    q = " ".join([re.split("--#", line)[0] for line in lines])
+    q = " ".join([re.split("--", line)[0] for line in lines])
+    logger.info(f"q:+++{q}+++")
 
     return q
+
+def reformat_query(sql_str):
+    """removes comments and converts to all uppercase and all whitespace to single spaces in order to simplify substring matching
+    
+    Arguments:
+        sql_str {str} -- query to be reformatted
+    
+    Returns:
+        [str] -- string containing the query with no comments and all whitespace converted to single spaces
+    """
+    query_no_comments = remove_comments(sql_str.upper())
+    logger.info(f"query after comments removed:")
+    logger.info(f"{query_no_comments}")
+
+    query_no_tabs_newlines = query_no_comments.replace("\t", " ").replace("\n", " ")
+    logger.info(f"query after tabs and newlines removed:")
+    logger.info(f"{query_no_tabs_newlines}")
+    query_single_spaces = query_no_tabs_newlines
+    while query_single_spaces.find("  ") > -1:
+        query_single_spaces = query_single_spaces.replace("  ", " ")
+
+    actual_select_position = 0
+    actual_from_position = 0
+    select_position = -6 # initialize to -6 so 1st pass will start at position 0
+    from_position = 0
+
+    reformatted_query = query_single_spaces
+    logger.info(f"sql_str: {sql_str}")
+# marker for code to be moved
+
+    return reformatted_query
+
 
 def split_unions(sql_str):
     return re.split('UNION', sql_str)

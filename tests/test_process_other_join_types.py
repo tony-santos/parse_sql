@@ -3,7 +3,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import extract_tables
+import extract_tables_columns
 
 def test_process_other_join_types_left_join_2_tables():
     table_line = '\n table1 LEFT JOIN TABLE2 ON TABLE1.COLUMN1 = TABLE2.COLUMN2'

@@ -11,7 +11,9 @@ from loguru import logger
 datetime_format = "%Y%m%d-%H%M"
 logfile_datetime = datetime.now().strftime(datetime_format)
 
-logger.add(f"output-{sys.argv[0].split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
+# logger.add(f"output-{sys.argv[0].split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
+# logger.add(f"output-{__file__.split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
+logger.add(f"extract_tables_columns-{logfile_datetime}.log", backtrace=True, diagnose=True)
 
 from extract_utilities import *
 
@@ -26,25 +28,26 @@ if __name__ == "__main__":
     columns = []
     logger.info(f"query read from file:")
     logger.info(f"{query1}")
-    query_no_comments = remove_comments(query1.upper())
-    logger.info(f"query after comments removed:")
-    logger.info(f"{query_no_comments}")
+#     query_no_comments = remove_comments(query1.upper())
+#     logger.info(f"query after comments removed:")
+#     logger.info(f"{query_no_comments}")
+# #TODO: create function to reformat query and move this code
+#     query_no_tabs_newlines = query_no_comments.replace("\t", " ").replace("\n", " ")
+#     logger.info(f"query after tabs and newlines removed:")
+#     logger.info(f"{query_no_tabs_newlines}")
+#     query_single_spaces = query_no_tabs_newlines
+#     while query_single_spaces.find("  ") > -1:
+#         query_single_spaces = query_single_spaces.replace("  ", " ")
 
-    query_no_tabs_newlines = query_no_comments.replace("\t", " ").replace("\n", " ")
-    logger.info(f"query after tabs and newlines removed:")
-    logger.info(f"{query_no_tabs_newlines}")
-    query_single_spaces = query_no_tabs_newlines
-    while query_single_spaces.find("  ") > -1:
-        query_single_spaces = query_single_spaces.replace("  ", " ")
+#     actual_select_position = 0
+#     actual_from_position = 0
+#     select_position = -6 # initialize to -6 so 1st pass will start at position 0
+#     from_position = 0
 
-    actual_select_position = 0
-    actual_from_position = 0
-    select_position = -6 # initialize to -6 so 1st pass will start at position 0
-    from_position = 0
-
-    sql_str = query_single_spaces
+    # sql_str = query_single_spaces
+    sql_str = reformat_query(query1)
     logger.info(f"sql_str: {sql_str}")
-
+# marker for code to be moved
     # while there are more SELECTs, get columns
     while more_selects(sql_str, select_position + 6):
         select_position = get_select_position(sql_str, select_position + 6)
