@@ -4,18 +4,17 @@ import re
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import string
+# import string
 
 from loguru import logger
 
 datetime_format = "%Y%m%d-%H%M"
 logfile_datetime = datetime.now().strftime(datetime_format)
 
-# logger.add(f"output-{sys.argv[0].split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
-# logger.add(f"output-{__file__.split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
 logger.add(f"extract_tables_columns-{logfile_datetime}.log", backtrace=True, diagnose=True)
 
-from extract_utilities import *
+# from extract_utilities import *
+import extract_utilities as eu
 
 
 if __name__ == "__main__":
@@ -28,30 +27,15 @@ if __name__ == "__main__":
     columns = []
     logger.info(f"query read from file:")
     logger.info(f"{query1}")
-#     query_no_comments = remove_comments(query1.upper())
-#     logger.info(f"query after comments removed:")
-#     logger.info(f"{query_no_comments}")
-# #TODO: create function to reformat query and move this code
-#     query_no_tabs_newlines = query_no_comments.replace("\t", " ").replace("\n", " ")
-#     logger.info(f"query after tabs and newlines removed:")
-#     logger.info(f"{query_no_tabs_newlines}")
-#     query_single_spaces = query_no_tabs_newlines
-#     while query_single_spaces.find("  ") > -1:
-#         query_single_spaces = query_single_spaces.replace("  ", " ")
 
-#     actual_select_position = 0
-#     actual_from_position = 0
-#     select_position = -6 # initialize to -6 so 1st pass will start at position 0
-#     from_position = 0
-
-    # sql_str = query_single_spaces
-    sql_str = reformat_query(query1)
+    sql_str = eu.reformat_query(query1)
     logger.info(f"sql_str: {sql_str}")
-# marker for code to be moved
+
     # while there are more SELECTs, get columns
-    while more_selects(sql_str, select_position + 6):
-        select_position = get_select_position(sql_str, select_position + 6)
-        from_position = get_matching_from_position(sql_str, select_position)
+    select_position = eu.get_select_position(sql_str, 0)
+    while eu.more_selects(sql_str, select_position + 6):
+        select_position = eu.get_select_position(sql_str, select_position + 6)
+        from_position = eu.get_matching_from_position(sql_str, select_position)
 
         logger.info(f"select_position: {select_position},   from_postion: {from_position}")
         logger.info(f"sql_str area between SELECT and FROM (inclusive): +++{sql_str[select_position:from_position+5]}+++")
@@ -67,26 +51,24 @@ if __name__ == "__main__":
     field_entries = []
     parsed_fields = []
     tables2 = []
-    logger.info(f"select_count = {select_count}")
-    logger.info(f"select_froms: {select_froms}")
+    logger.info(f"there are {select_count} SELECT-FROM pairs: {select_froms}")
     for select_pos, from_pos in select_froms:
-        # logger.info(f"sql_str area between SELECT and FROM (inclusive): +++{sql_str[select_pos:from_pos+5]}+++")
-        logger.info(f"sql_str area between SELECT and FROM (eclusive): +++{sql_str[select_pos+len('SELECT'):from_pos].lstrip().rstrip()}+++")
+        logger.info(f"sql_str area between SELECT and FROM (exclusive): +++{sql_str[select_pos+len('SELECT'):from_pos].lstrip().rstrip()}+++")
         # get fields
-        fields = split_fields(sql_str[select_pos+len('SELECT'):from_pos].lstrip().rstrip())
+        fields = eu.split_fields(sql_str[select_pos+len('SELECT'):from_pos].lstrip().rstrip())
         logger.info(f"fields = {fields}")
-# remove section
-        for field in fields:
-            logger.info(f"field = {field}")
-            parse_field(field)
-            logger.info(f"parsed_version = {parse_field(field)}")
-# remove section
-        parsed_fields = [parse_field(field) for field in fields]
+# # remove section
+#         for field in fields:
+#             logger.info(f"field = {field}")
+#             eu.parse_field(field)
+#             logger.info(f"parsed_version = {eu.parse_field(field)}")
+# # remove section
+        parsed_fields = [eu.parse_field(field) for field in fields]
         logger.info(f"parsed_fields: {parsed_fields}")
         # check for table_alias
         logger.info(f"fields[0]: {fields[0]}")
         if fields[0].find('.') == -1: # no table alias found. get table name next to FROM
-            table_entry = get_table_next_to_from(sql_str, from_pos)
+            table_entry = eu.get_table_next_to_from(sql_str, from_pos)
             logger.info(f"table_entry: {table_entry}")
             table_name = table_entry[0]
             logger.info(f"table_name: {table_name}")
@@ -105,7 +87,7 @@ if __name__ == "__main__":
     logger.info(f"\n\n")
     logger.info(f"getting tables")
     logger.info(f"select_froms{select_froms}")
-    tables2.extend(get_tables_after_froms(sql_str, select_froms))
+    tables2.extend(eu.get_tables_after_froms(sql_str, select_froms))
     logger.info(f"tables: {tables2}")
 
     join_positions = []
@@ -117,7 +99,7 @@ if __name__ == "__main__":
     logger.info(f"join_positions: {join_positions}")
 
     for join_position in join_positions:
-        tables2.append(get_table_next_to_join(sql_str, join_position))
+        tables2.append(eu.get_table_next_to_join(sql_str, join_position))
 
     tables2.append(('DERIVED', 'DERIVED'))
 

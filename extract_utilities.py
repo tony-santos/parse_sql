@@ -56,16 +56,6 @@ def reformat_query(sql_str):
     return reformatted_query
 
 
-def split_unions(sql_str):
-    return re.split('UNION', sql_str)
-
-def get_main_select(sql_str):
-    return re.search('SELECT (.+?) FROM', sql_str, re.DOTALL).group(0)
-
-def get_rest_after_main_select(sql_str):
-    return sql_str[sql_str.upper().find("FROM")+4:]
-#    return re.search('FROM (.+?)', sql_str, re.DOTALL).group(1)
-
 def get_select_position(sql_str, start_pos=0):
     logger.info(f"entering get_select_position: start_pos = {start_pos}   sql_str: {sql_str[start_pos: start_pos+200]}")
     select_position = sql_str.upper().find('SELECT', start_pos)
@@ -127,7 +117,7 @@ def get_matching_where_position(sql_str, from_pos):
     # get where or end of query at same level ('WHERE', ';', ')' if paren-level == -1)
     logger.info(f"entering get_matching_where_position: from_pos: {from_pos}")
     logger.info(f"sql_str: {sql_str[from_pos: from_pos + 130]}")
-    # make copy of sql_str
+
     orig_sql_str = sql_str
     sql_str = sql_str.upper()[from_pos:]
     select_level = 1
@@ -202,17 +192,6 @@ def get_matching_where_position(sql_str, from_pos):
     logger.info(f"select_level: {select_level}")
     logger.info(f"returning from get_matching_where_position.      matching_where_position: {matching_where_position} end of from clause: {orig_sql_str[matching_where_position - 20:matching_where_position]}+++")
     return matching_where_position
-
-def get_from_position(sql_str, start_pos=0):
-    sql_str = sql_str.upper()
-    from_position = sql_str.find('FROM', start_pos)
-    logger.info(f"from_position: {from_position}")
-    if from_position > -1:
-        logger.info(f"before FROM: {from_position}")
-        select_position = sql_str.find('SELECT', 0, from_position)
-        if select_position > -1:
-            logger.info(f"SELECT found in field list at position: {sql_str}. probable subquery")
-            logger.info(f"sql_str: {sql_str[:from_position]}")
 
 def get_matching_paren_position(sql_str, open_paren_position=0):
     paren_level = 0
@@ -349,43 +328,6 @@ def split_fields(fields_string, separator=','):
     logger.info(f"fields: {fields}")
     return fields
             
-# def get_tables_after_from(sql_str):
-#     sql_str = sql_str.upper()
-#     table_list = []
-
-#     new_from_location = prev_from_location = sql_str.find('FROM ')
-#     after_from = sql_str
-#     start_pos = end_pos = 0
-#     while new_from_location > -1:
-#         logger.info(f"new_from_location: {new_from_location}")
-#         after_from = sql_str[new_from_location+len('FROM '):].lstrip().rstrip()
-#         logger.info(f"after_from = +++{after_from}+++")
-#         if after_from.startswith('('):
-#             # ( after FROM or JOIN is a subquery)
-#             logger.info(f"subquery found. getting subquery alias and adding to table_list")
-#             end_pos = get_matching_paren_position(after_from, 0)
-#             subquery = after_from[:end_pos+1]
-#             logger.info(f"subquery: +++{subquery}+++")
-#             subquery_alias = get_subquery_alias(sql_str, subquery)
-#             table_list.append(('SUBQUERY', subquery_alias))
-#             # get table names next to JOIN keywords
-#             start_pos = end_pos + 1
-
-#         join_pos = sql_str.find(' JOIN ', start_pos, end_pos)
-#         while join_pos > -1:
-#             logger.info(f"join_pos: {join_pos}")
-#             table_list.append(get_table_next_to_join(sql_str, join_pos))
-#             join_pos = sql_str.find(' JOIN ', join_pos + 6)
-
-#         # get location of next from
-#         prev_from_location = new_from_location
-#         new_from_location = sql_str.find(' FROM ', prev_from_location+1) # need +1 to not match same substring
-#         logger.info(f"prev_from_location: {prev_from_location}")
-#         logger.info(f"new_from_location: {new_from_location}")
-#     logger.info(f"returning from get_tables_after_from")
-#     logger.info(f"table_list: {table_list}")
-#     exit(0)
-#     return table_list
 
 def get_tables_after_froms(sql_str, select_froms):
     sql_str = sql_str.upper()
@@ -433,13 +375,14 @@ def get_table_next_to_from(sql_str, from_pos): # does not handle subqueries
     logger.info(f"entering get_table_next_to_from: sql_str: +++{sql_str[from_pos:from_pos + 100]}+++")
     tokens = sql_str[from_pos:].split()[0:4]
     logger.info(f"tokens: {tokens}")
+    print(f"tokens: {tokens}")
     if tokens[0] == 'FROM':
         tokens = tokens[1:] # drop 1st token
 
     table_name = tokens[0]
 
     #check for alias
-    if tokens[1] in ['ON', 'UNION', 'LEFT', 'RIGHT', 'WHERE', ')']: # no alias
+    if tokens[1] in ['ON', 'UNION', 'LEFT', 'RIGHT', 'WHERE', ')', ',']: # no alias
         table_alias = table_name
     elif tokens[1] == 'AS': # next token is the alias
         table_alias = tokens[2]
@@ -467,70 +410,3 @@ def get_table_next_to_join(sql_str, join_pos): # does not handle subqueries
         table_alias = tokens[1]
 
     return (table_name, table_alias)
-
-
-
-if __name__ == "__main__":
-    
-    query1 = """
-    CREATE OR REPLACE VIEW rlsc_master.v_webmtbs_unified_view
-    AS
-    /* should be removed */
-    -- should be removed
-    --- should be removed
-
-    ---without the DISTINCT, the time takes to generate the mv_v_ will be cut a lot, and the total number of records will not differ much
-    SELECT protocol_instance.md_batch_name AS experiment_run_info_metid,  -- should be removed
-            protocol_instance.md_compound_name AS compound_name_metid,  /* should be removed */
-            "substring"(protocol_instance.md_compound_name::text, 1, 11) AS parent_id_metid, protocol_instance.md_id AS protocol_instance_id_metid, clustered_compound.md_id AS clustered_compound_id_metid, compound_data.md_area_ms AS ms_signal_area_metid, compound_data.md_id AS compound_data_id_metid, compound_data.md_ion_formula AS metabolite_ion_formula_metid, compound_data.metabolite_mz_value_metid, compound_data.metabolite_mz_diff_ppm_metid, compound_data.metabolite_mz_diff_mda_metid, compound_data.md_name AS metabolite_name_metid, compound_data.metabolite_area_abs_metid, mim_calc.mim AS metabolite_mim_metid, mass_shift_calc.mass_shift AS mass_shift_metid, compound_data.retention_time_metid, compound_data.md_z AS metabolite_z_metid, 
-            
-    FROM (
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_clinical_signs
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_invivo_results
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_food_consumption
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_necropsy
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_histopathology
-    ) mv_v_salar_animal_txt_study
-    LEFT JOIN (
-    SELECT animal_txt2, study2, studyday2
-    FROM rlsc_master.mv_v_salar_clinical_signs
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_invivo_results
-    UNION
-    SELECT animal_txt, study, studyday
-    FROM rlsc_master.mv_v_salar_food_consumption
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_necropsy
-    UNION
-    SELECT animal_txt, study, NULL as studyday
-    FROM rlsc_master.mv_v_salar_histopathology
-    ) mv_v_salar_animal_txt_study2
-    LEFT JOIN rlsc_master.webmtbs_md_protocol_instance protocol_instance
-
-    LEFT JOIN rlsc_master.mv_v_webmtbs_unified_view_compound_data compound_data ON protocol_instance.md_id = compound_data.md_protocol_instance_id
-    LEFT JOIN rlsc_master.webmtbs_md_experiment experiment ON compound_data.md_experiment_id = experiment.md_id
-    LEFT JOIN rlsc_master.mv_v_webmtbs_unified_view_clustered_compound
-    
-    clustered_compound ON clustered_compound.compound_md_id = compound_data.md_id
-    ---LEFT JOIN rlsc_master.webmtbs_md_compound_data compound_sub ON compound_sub.md_id = experiment.md_substrate_id
-    WHERE protocol_instance.md_approved = 1
-    with no schema binding;
-    """
-
-    print_buffer()
-    query_no_comments = remove_comments(query1)
-
-    #print(find_sub_queries(query_no_comments))
-    # get columns
-#    columns = get_columns(query_no_comments)
