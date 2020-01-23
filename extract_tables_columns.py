@@ -57,12 +57,7 @@ if __name__ == "__main__":
         # get fields
         fields = eu.split_fields(sql_str[select_pos+len('SELECT'):from_pos].lstrip().rstrip())
         logger.info(f"fields = {fields}")
-# # remove section
-#         for field in fields:
-#             logger.info(f"field = {field}")
-#             eu.parse_field(field)
-#             logger.info(f"parsed_version = {eu.parse_field(field)}")
-# # remove section
+
         parsed_fields = [eu.parse_field(field) for field in fields]
         logger.info(f"parsed_fields: {parsed_fields}")
         # check for table_alias
@@ -90,13 +85,13 @@ if __name__ == "__main__":
     tables2.extend(eu.get_tables_after_froms(sql_str, select_froms))
     logger.info(f"tables: {tables2}")
 
-    join_positions = []
-    start_pos = 0
-    while sql_str.find(' JOIN ', start_pos) > -1:
-        new_join_position = sql_str.find(' JOIN ', start_pos)
-        join_positions.append(new_join_position)
-        start_pos = new_join_position + 1
-    logger.info(f"join_positions: {join_positions}")
+    join_positions = eu.get_join_positions(sql_str)
+    # start_pos = 0
+    # while sql_str.find(' JOIN ', start_pos) > -1:
+    #     new_join_position = sql_str.find(' JOIN ', start_pos)
+    #     join_positions.append(new_join_position)
+    #     start_pos = new_join_position + 1
+    # logger.info(f"join_positions: {join_positions}")
 
     for join_position in join_positions:
         tables2.append(eu.get_table_next_to_join(sql_str, join_position))

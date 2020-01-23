@@ -87,7 +87,7 @@ def get_matching_from_position(sql_str, start_pos=0):
     matching_from_position = -1
     tokens = sql_str.split() # generate list of tokens in order to grab multiple tokens later
     for index, token in enumerate(tokens[1:]):  # skip 1st token (shuold be SELECT)
-        logger.info(f"index: {index},      token: {token}")
+        # logger.info(f"index: {index},      token: {token}")
         if token == 'SELECT':
             select_level = select_level + 1
             logger.info(f"another select found. select_level: {select_level}")
@@ -127,7 +127,7 @@ def get_matching_where_position(sql_str, from_pos):
     matching_where_position = -1
     tokens = sql_str.split() # generate list of tokens in order to grab multiple tokens later
     for index, token in enumerate(tokens[1:]):  # skip 1st token (shuold be FROM)
-        logger.info(f"index: {index},      token: {token}")
+        # logger.info(f"index: {index},      token: {token}")
         if token == '(':
             open_paren_found = True
             paren_level = paren_level + 1
@@ -209,6 +209,17 @@ def get_matching_paren_position(sql_str, open_paren_position=0):
     logger.info(f"paren_level: {paren_level}")
 
     return matching_paren_position
+
+def get_join_positions(sql_str):
+    join_positions = []
+    start_pos = 0
+    while sql_str.find(' JOIN ', start_pos) > -1:
+        new_join_position = sql_str.find(' JOIN ', start_pos)
+        join_positions.append(new_join_position)
+        start_pos = new_join_position + 1
+    logger.info(f"join_positions: {join_positions}")
+    return join_positions
+
 
 def parse_field(field):
     logger.info(f"entering parse_field: field = {field}")
@@ -339,7 +350,7 @@ def get_tables_after_froms(sql_str, select_froms):
     for new_select_location, new_from_location in select_froms:
         logger.info(f"new_from_location: {new_from_location}")
         after_from = sql_str[new_from_location+len('FROM '):].lstrip().rstrip()
-        logger.info(f"after_from = +++{after_from}+++")
+        # logger.info(f"after_from = +++{after_from}+++")
         if after_from.startswith('('):
             # ( after FROM or JOIN is a subquery)
             logger.info(f"subquery found. getting subquery alias and adding to table_list")
