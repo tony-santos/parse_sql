@@ -26,12 +26,13 @@ datetime_format = "%Y%m%d-%H%M"
 logfile_datetime = datetime.now().strftime(datetime_format)
 
 # logger.add(f"extract_tables_columns-{logfile_datetime}.log", backtrace=True, diagnose=True)
-logger.add(f"{__file__.split('.')[0]}-{logfile_datetime}.log", backtrace=True, diagnose=True)
+logger.add(f"{__file__.split('.')[0]        }-{logfile_datetime}.log", backtrace=True, diagnose=True)
 
 import extract_utilities as eu 
 
 
 def is_subselect(parsed):
+    # I think this needs to be made to see (SELECT as well as SELECT)
     if not parsed.is_group:
         return False
     for item in parsed.tokens:
@@ -63,19 +64,24 @@ def extract_from_part(parsed):
 
 def extract_table_identifiers(token_stream):
     for item in token_stream:
+        logger.info(f"item: {item}")
         if isinstance(item, IdentifierList):
+            logger.info(f"isIntance(item, IdentifierList: {IdentifierList}")
             for identifier in item.get_identifiers():
                 yield identifier.get_name()
         elif isinstance(item, Identifier):
+            logger.info(f"isIntance(item, Identifier: {Identifier}")
             yield item.get_name()
         # It's a bug to check for Keyword here, but in the example
         # above some tables names are identified as keywords...
         elif item.ttype is Keyword:
+            logger.info(f"item.ttype is Keyword: {item.value}")
             yield item.value
 
 
 def extract_tables(sql):
     stream = extract_from_part(sqlparse.parse(sql)[0])
+    logger.info(f"stream: {stream}")
     return list(extract_table_identifiers(stream))
 
 
