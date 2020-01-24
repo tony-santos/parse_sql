@@ -32,11 +32,11 @@ import extract_utilities as eu
 
 
 def is_subselect(parsed):
-    # I think this needs to be made to see (SELECT as well as SELECT)
+    # I think this needs to be made to see "( SELECT" as well as SELECT)
     if not parsed.is_group:
         return False
     for item in parsed.tokens:
-        logger.info(f"item: {item}")
+        logger.info(f"item: +++{item}+++    item.ttype: +++{item.ttype}+++")
         logger.info(f"is_subselect: {item.ttype is DML and item.value.upper() == 'SELECT'}")
         if item.ttype is DML and item.value.upper() == 'SELECT':
             return True
@@ -46,7 +46,7 @@ def is_subselect(parsed):
 def extract_from_part(parsed):
     from_seen = False
     for item in parsed.tokens:
-        logger.info(f"item: +++{item}+++")
+        logger.info(f"item.value: +++{item.value}+++       -- item.ttype:{item.ttype}")
         if from_seen:
             if is_subselect(item):
                 for x in extract_from_part(item):
@@ -98,7 +98,10 @@ if __name__ == '__main__':
     sql_str = eu.reformat_query(query1)
     logger.info(f"sql_str: {sql_str}")
 
-    parsed = sqlparse.parse(sql_str)[0]
+    parsed = sqlparse.parse(sql_str)[0] # only parse the first sql statement 
+
+    logger.info(f"sqlparse.parse(sql_str): +++{sqlparse.parse(sql_str)}+++")
+    logger.info(f"type(parsed): {type(parsed)}")
 
     tables = ', '.join(extract_tables(sql_str))
     print('Tables: {0}'.format(tables))
