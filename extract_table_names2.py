@@ -17,10 +17,20 @@ import sqlparse
 from sqlparse.sql import IdentifierList, Identifier
 from sqlparse.tokens import Keyword, DML
 
+import os
 import sys
 from datetime import datetime
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import extract_utilities as eu
+
 from loguru import logger
+
+datetime_format = "%Y%m%d-%H%M"
+logfile_datetime = datetime.now().strftime(datetime_format)
+
+logger.add(f"extract_tables_columns-{logfile_datetime}.log", backtrace=True, diagnose=True)
+
 
 datetime_format = "%Y%m%d-%H%M"
 logfile_datetime = datetime.now().strftime(datetime_format)
@@ -41,6 +51,9 @@ def is_subselect(parsed):
         if item.ttype is DML and item.value.upper() == 'SELECT':
             logger.info(f"is_subselect: TRUE")
             return True
+        elif item.value.upper().startswith('( SELECT'):
+            logger.info(f"is_subselect: TRUE")
+            return True
     return False
 
 
@@ -50,9 +63,16 @@ def  extract_from_part(parsed):
         logger.info(f"item.value: +++{item.value}+++       -- item.ttype:{item.ttype}       -- from_seen:{from_seen}")
         if from_seen:
             if is_subselect(item):
+                logger.info(f"subselect found: {item}")
+                logger.info(f"yielding item: {item}")
+                yield item
+                subselect_sql = item.value[0:eu.get_matching_paren_position(item.value, 0)]
+                logger.info(f"subselect_Sql: +++{subselect_sql}+++")
+                item2 = sqlparse.parse(subselect_sql)[0]
                 for x in extract_from_part(item2):
                     logger.info(f"yielding x: {x}")
                     yield x
+                # exit(0)
             elif item.ttype is Keyword:
                 logger.info(f"keyword encountered. just returning")
                 # return
