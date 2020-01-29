@@ -15,7 +15,7 @@
 
 import sqlparse
 from sqlparse.sql import IdentifierList, Identifier
-from sqlparse.tokens import Keyword, DML
+from sqlparse.tokens import Keyword, DML, Whitespace
 
 import os
 import sys
@@ -44,11 +44,13 @@ import extract_utilities as eu
 def is_subselect(parsed):
     # I think this needs to be made to see "( SELECT" as well as SELECT)
     if not parsed.is_group:
+        logger.info(f"not a group. returning FALSE")
         return False
     for item in parsed.tokens:
         logger.info(f"item.value.upper().startswith('( SELECT'): {item.value.upper().startswith('( SELECT')}")
         logger.info(f"item: +++{item}+++    item.ttype: +++{item.ttype}+++")
-        if item.ttype is DML and item.value.upper() == 'SELECT':
+        # if item.ttype is DML and item.value.upper() == 'SELECT':
+        if item.value.upper() == 'SELECT':
             logger.info(f"is_subselect: TRUE")
             return True
         elif item.value.upper().startswith('( SELECT'):
@@ -59,16 +61,20 @@ def is_subselect(parsed):
 
 def  extract_from_part(parsed):
     from_seen = False
-    for item in parsed.tokens:
+    for index, item in enumerate(parsed.tokens):
         logger.info(f"item.value: +++{item.value}+++       -- item.ttype:{item.ttype}       -- from_seen:{from_seen}")
         if from_seen:
             if is_subselect(item):
                 logger.info(f"subselect found: {item}")
                 logger.info(f"yielding item: {item}")
                 yield item
-                subselect_sql = item.value[0:eu.get_matching_paren_position(item.value, 0)]
-                logger.info(f"subselect_Sql: +++{subselect_sql}+++")
+                if item.value.startswith('('):
+                    subselect_sql = item.value[1:eu.get_matching_paren_position(item.value, 0)]
+                else:
+                    subselect_sql = ''.join(parsed.tokens[index:])
+                logger.info(f"subselect_sql: +++{subselect_sql}+++")
                 item2 = sqlparse.parse(subselect_sql)[0]
+                logger.info(f"calling extract_from_part recursively")
                 for x in extract_from_part(item2):
                     logger.info(f"yielding x: {x}")
                     yield x
@@ -77,6 +83,8 @@ def  extract_from_part(parsed):
                 logger.info(f"keyword encountered. just returning")
                 # return
                 yield item
+            elif item.ttype is Whitespace:
+                logger.info(f"whitespace encountered and skipped")
             else:
                 logger.info(f"yielding item: {item}")
                 yield item
